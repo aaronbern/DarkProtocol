@@ -1,0 +1,54 @@
+{
+    "name": "GamePlayActions",
+    "maps": [
+        {
+            "name": "Player",
+            "id": "65d84637-a73f-4f92-b62a-8662e3a78241",
+            "actions": [
+                {
+                    "name": "Click",
+                    "type": "Button",
+                    "id": "b74db56f-6cb4-4cfc-bd47-0b9ccd6be8fe",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "TabKey",
+                    "type": "Button",
+                    "id": "65467be1-62bf-432b-ba42-3ad6183a0ddd",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "b135e399-75e8-4be8-b481-bc37540881bd",
+                    "path": "<Mouse>/leftButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Click",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "4d1a1173-7c07-40d2-8ad3-eea384ea1824",
+                    "path": "<Keyboard>/tab",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "TabKey",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        }
+    ],
+    "controlSchemes": []
+}
