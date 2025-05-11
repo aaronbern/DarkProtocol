@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 293aec6bc6eb1f9438e4970dbaf26a38, type: 3}
   m_Name: DefaultGrid
   m_EditorClassIdentifier: 
-  width: 20
-  height: 20
+  width: 50
+  height: 50
   cellSize: 1
   mapOrigin: {x: 0, y: 0, z: 0}
   chunkSize: 10

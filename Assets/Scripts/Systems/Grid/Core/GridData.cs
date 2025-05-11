@@ -13,8 +13,8 @@ namespace DarkProtocol.Grid
     {
         #region Map Settings
         [Header("Map Dimensions")]
-        [SerializeField] private int width = 20;
-        [SerializeField] private int height = 20;
+        [SerializeField] private int width = 50;
+        [SerializeField] private int height = 50;
         [SerializeField] private float cellSize = 1f;
         [SerializeField] private Vector3 mapOrigin = Vector3.zero;
         
@@ -51,6 +51,12 @@ namespace DarkProtocol.Grid
         /// </summary>
         public void Initialize()
         {
+            // Center the grid on its own midpoint
+            mapOrigin = new Vector3(
+                -width  * cellSize * 0.5f,
+                mapOrigin.y,
+                -height * cellSize * 0.5f
+            );
             // Create the tile data array
             _tileData = new TileData[width, height];
             

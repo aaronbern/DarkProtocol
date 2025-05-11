@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using DarkProtocol.Grid;
 using UnityEngine;
 
 /// <summary>
@@ -614,17 +615,22 @@ public class Unit : MonoBehaviour
     {
         // Verify the unit can move
         if (!IsAlive || !SpendMovementPoints(movementCost))
-        {
             return false;
+
+        // Use UnitGridAdapter if present
+        UnitGridAdapter adapter = GetComponent<UnitGridAdapter>();
+        if (adapter != null)
+        {
+            return adapter.HandleMoveRequest(targetPosition, movementCost);
         }
-        
-        // This is a stub for the actual movement implementation
-        // In a real implementation, this would involve pathfinding and animation
+
+        // fallback (editor testing / emergency)
         transform.position = targetPosition;
-        Debug.Log($"{unitName} moved to {targetPosition} (remaining movement: {currentMovementPoints})");
-        
+        Debug.LogWarning($"{unitName} moved directly to {targetPosition} (adapter missing!)");
+
         return true;
     }
+
     
     #endregion
 }

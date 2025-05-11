@@ -151,20 +151,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ac29027af13b21744a0e8df43e999165, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  gridData: {fileID: 0}
-  createNewGridOnStart: 0
-  defaultWidth: 20
-  defaultHeight: 20
+  gridData: {fileID: 11400000, guid: a8e7b768e77b2a4418611c9282a03208, type: 2}
+  createNewGridOnStart: 1
+  defaultWidth: 50
+  defaultHeight: 50
   defaultCellSize: 1
   showGridInEditor: 1
   showGridInGame: 1
-  gridLineColor: {r: 0.3, g: 0.3, b: 0.3, a: 0.3}
+  gridLineColor: {r: 0.21960661, g: 0.990566, b: 0.9539694, a: 0.14117648}
   gridLineWidth: 0.02
-  movementRangeMaterial: {fileID: 0}
   movementRangeColor: {r: 0.2, g: 0.8, b: 0.4, a: 0.5}
-  movementRangeHeight: 0.05
+  pathPreviewColor: {r: 1, g: 0.8, b: 0.2, a: 0.7}
   gridParent: {fileID: 0}
   mainCamera: {fileID: 0}
+  gridOverlaySystem: {fileID: 0}
   enableDebugView: 0
   showPathfindingResults: 1
 --- !u!114 &116776468
@@ -183,7 +183,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 59
   maxSelectionDistance: 100
-  clickActionReference: {fileID: 0}
+  clickActionReference: {fileID: -1029286799505597638, guid: 215bb6e7c0bfe6644b8ba7cd2d162dc1, type: 3}
 --- !u!114 &116776469
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -200,7 +200,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 59
   autoSelectSingleUnit: 1
-  tabActionReference: {fileID: 0}
+  tabActionReference: {fileID: -4325279744780787688, guid: 215bb6e7c0bfe6644b8ba7cd2d162dc1, type: 3}
   showDebugInfo: 1
   OnUnitSelected:
     m_PersistentCalls:
@@ -370,6 +370,7 @@ GameObject:
   - component: {fileID: 1904866469}
   - component: {fileID: 1904866468}
   - component: {fileID: 1904866467}
+  - component: {fileID: 1904866472}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -389,9 +390,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4026cdd77908cc3498d8170c851530ad, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  minBounds: {x: -5, y: -5}
-  maxBounds: {x: 5, y: 5}
-  visualizeBounds: 0
+  minBounds: {x: -35, y: -35}
+  maxBounds: {x: 35, y: 35}
+  visualizeBounds: 1
   boundsColor: {r: 1, g: 0.5, b: 0, a: 0.5}
   autoCalculateFromGrid: 1
   gridManager: {fileID: 0}
@@ -515,6 +516,36 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 50, y: 0, z: 0}
+--- !u!114 &1904866472
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1904866466}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbe2eb999ff33b14f89bd5cccf2cb4c9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  mapBounds: {fileID: 1904866467}
+  moveSpeed: 15
+  moveAcceleration: 8
+  moveDeceleration: 12
+  keyboardSensitivity: 1
+  fastMoveFactor: 2.5
+  zoomSpeed: 25
+  zoomAcceleration: 15
+  minZoomDistance: 10
+  maxZoomDistance: 30
+  groundHeight: 0
+  zoomAlongForwardAxis: 1
+  rotationSpeed: 90
+  rotationAcceleration: 15
+  rotationDeceleration: 20
+  rotateAroundFocusPoint: 1
+  focusDistance: 10
+  showDebugInfo: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

@@ -43,13 +43,13 @@ namespace DarkProtocol.Grid
         [SerializeField] private float gridLineWidth = 0.02f;
         
         [Header("Movement Range Visualization")]
-        [SerializeField] private Material movementRangeMaterial;
         [SerializeField] private Color movementRangeColor = new Color(0.2f, 0.8f, 0.4f, 0.5f);
-        [SerializeField] private float movementRangeHeight = 0.05f;
+        [SerializeField] private Color pathPreviewColor = new Color(1f, 0.8f, 0.2f, 0.7f);
         
         [Header("Object References")]
         [SerializeField] private Transform gridParent;
         [SerializeField] private Camera mainCamera;
+        [SerializeField] private GridOverlaySystem gridOverlaySystem;
         
         [Header("Debug")]
         [SerializeField] private bool enableDebugView = false;
@@ -57,10 +57,6 @@ namespace DarkProtocol.Grid
         #endregion
 
         #region Private Variables
-        // References
-        private Dictionary<Vector2Int, GameObject> _movementRangeVisuals = new Dictionary<Vector2Int, GameObject>();
-        private Dictionary<Vector2Int, GameObject> _pathfindingVisuals = new Dictionary<Vector2Int, GameObject>();
-        
         // Currently selected unit and its state
         private Unit _selectedUnit;
         private List<Vector2Int> _currentMovementRange = new List<Vector2Int>();
@@ -128,6 +124,30 @@ namespace DarkProtocol.Grid
             if (mainCamera != null)
             {
                 _lastCameraPosition = mainCamera.transform.position;
+            }
+            
+            // Get reference to GridOverlaySystem if not already set
+            if (gridOverlaySystem == null)
+            {
+                gridOverlaySystem = GetComponent<GridOverlaySystem>();
+                
+                if (gridOverlaySystem == null)
+                {
+                    gridOverlaySystem = FindFirstObjectByType<GridOverlaySystem>();
+                    
+                    if (gridOverlaySystem == null && Application.isPlaying)
+                    {
+                        // Create the overlay system component if it doesn't exist
+                        gridOverlaySystem = gameObject.AddComponent<GridOverlaySystem>();
+                    }
+                }
+            }
+            
+            // Set colors on the grid overlay system
+            if (gridOverlaySystem != null)
+            {
+                gridOverlaySystem.SetMovementRangeColor(movementRangeColor);
+                gridOverlaySystem.SetPathPreviewColor(pathPreviewColor);
             }
         }
         
@@ -287,6 +307,7 @@ namespace DarkProtocol.Grid
         {
             return gridData?.GetTileData(x, z)?.TerrainType ?? TerrainType.Ground;
         }
+        
         /// <summary>
         /// Centers the grid on the world origin
         /// </summary>
@@ -328,16 +349,15 @@ namespace DarkProtocol.Grid
             }
         }
 
-        // Add this method to ensure your default size values are respected
         /// <summary>
         /// Creates a new grid using default settings from the inspector
         /// </summary>
         public void CreateGridWithDefaultSettings()
         {
             // Get the default values from your inspector fields
-            int defaultWidth = this.defaultWidth; // 10 based on your screenshot
-            int defaultHeight = this.defaultHeight; // 10 based on your screenshot
-            float defaultCellSize = this.defaultCellSize; // 1 based on your screenshot
+            int defaultWidth = this.defaultWidth;
+            int defaultHeight = this.defaultHeight;
+            float defaultCellSize = this.defaultCellSize;
             
             // Create a new grid data instance if needed
             if (gridData == null)
@@ -368,6 +388,7 @@ namespace DarkProtocol.Grid
             
             Debug.Log($"Created grid with size {defaultWidth}x{defaultHeight}, cell size {defaultCellSize}, centered on origin");
         }
+        
         /// <summary>
         /// Set the terrain type at a specific position
         /// </summary>
@@ -418,8 +439,11 @@ namespace DarkProtocol.Grid
             // Calculate movement range
             _currentMovementRange = gridData.CalculateMovementRange(unitPos, movementPoints);
             
-            // Create visualization
-            ShowMovementRangeVisuals(_currentMovementRange);
+            // Show visualization using grid overlay system
+            if (gridOverlaySystem != null)
+            {
+                gridOverlaySystem.ShowMovementRange(_currentMovementRange);
+            }
             
             return _currentMovementRange;
         }
@@ -429,20 +453,13 @@ namespace DarkProtocol.Grid
         /// </summary>
         public void ClearMovementRange()
         {
-            // Clear visualization objects
-            foreach (var visual in _movementRangeVisuals.Values)
-            {
-                if (visual != null)
-                {
-                    if (Application.isPlaying)
-                        Destroy(visual);
-                    else
-                        DestroyImmediate(visual);
-                }
-            }
-            
-            _movementRangeVisuals.Clear();
             _currentMovementRange.Clear();
+            
+            // Clear visualization using grid overlay system
+            if (gridOverlaySystem != null)
+            {
+                gridOverlaySystem.ClearMovementRange();
+            }
         }
         
         /// <summary>
@@ -459,33 +476,10 @@ namespace DarkProtocol.Grid
             // Store the current path
             _currentPath = new List<Vector2Int>(path);
             
-            // Create visualization
-            for (int i = 0; i < path.Count; i++)
+            // Show visualization using grid overlay system
+            if (gridOverlaySystem != null)
             {
-                Vector2Int pos = path[i];
-                
-                // Skip if this is a visualization we already have (like the movement range)
-                if (_movementRangeVisuals.ContainsKey(pos))
-                    continue;
-                    
-                // Create visual
-                Vector3 worldPos = GridToWorldPosition(pos);
-                worldPos.y += 0.05f; // Slightly above the ground
-                
-                GameObject visual = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                visual.transform.position = worldPos;
-                visual.transform.localScale = new Vector3(0.3f, 0.05f, 0.3f);
-                visual.transform.SetParent(gridParent);
-                
-                // Use a different material/color for the path
-                Renderer renderer = visual.GetComponent<Renderer>();
-                if (renderer != null)
-                {
-                    renderer.material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-                    renderer.material.color = new Color(1f, 0.8f, 0.2f, 0.7f);
-                }
-                
-                _pathfindingVisuals[pos] = visual;
+                gridOverlaySystem.ShowPathPreview(_currentPath);
             }
         }
         
@@ -494,20 +488,13 @@ namespace DarkProtocol.Grid
         /// </summary>
         public void ClearPathVisualization()
         {
-            // Clear visualization objects
-            foreach (var visual in _pathfindingVisuals.Values)
-            {
-                if (visual != null)
-                {
-                    if (Application.isPlaying)
-                        Destroy(visual);
-                    else
-                        DestroyImmediate(visual);
-                }
-            }
-            
-            _pathfindingVisuals.Clear();
             _currentPath.Clear();
+            
+            // Clear visualization using grid overlay system
+            if (gridOverlaySystem != null)
+            {
+                gridOverlaySystem.ClearPathPreview();
+            }
         }
         
         /// <summary>
@@ -694,45 +681,6 @@ namespace DarkProtocol.Grid
         #endregion
 
         #region Visualization Methods
-        /// <summary>
-        /// Show visuals for the movement range
-        /// </summary>
-        private void ShowMovementRangeVisuals(List<Vector2Int> movementRange)
-        {
-            if (movementRange == null)
-                return;
-                
-            // Create visual for each tile in range
-            foreach (Vector2Int pos in movementRange)
-            {
-                Vector3 worldPos = GridToWorldPosition(pos);
-                worldPos.y += movementRangeHeight; // Slightly above the ground
-                
-                GameObject visual = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                visual.transform.position = worldPos;
-                visual.transform.localScale = new Vector3(0.8f, 0.05f, 0.8f);
-                visual.transform.SetParent(gridParent);
-                
-                // Apply material
-                Renderer renderer = visual.GetComponent<Renderer>();
-                if (renderer != null)
-                {
-                    if (movementRangeMaterial != null)
-                    {
-                        renderer.material = new Material(movementRangeMaterial);
-                    }
-                    else
-                    {
-                        renderer.material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-                    }
-                    
-                    renderer.material.color = movementRangeColor;
-                }
-                
-                _movementRangeVisuals[pos] = visual;
-            }
-        }
-        
         /// <summary>
         /// Draw grid gizmos in the editor
         /// </summary>
