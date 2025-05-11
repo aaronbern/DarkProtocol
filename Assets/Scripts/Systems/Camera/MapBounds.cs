@@ -1,4 +1,5 @@
 using UnityEngine;
+using DarkProtocol.Grid;
 
 /// <summary>
 /// Restricts the main camera's movement to stay within defined map boundaries.
@@ -25,8 +26,14 @@ public class MapBounds : MonoBehaviour
     [Tooltip("Automatically calculate bounds from GridManager?")]
     [SerializeField] private bool autoCalculateFromGrid = true;
     
+    [Tooltip("Reference to the grid manager (optional, will find automatically if not set)")]
+    [SerializeField] private GridManager gridManager;
+    
     [Tooltip("Optional padding to add around grid bounds")]
-    [SerializeField] private float gridPadding = 1.0f;
+    [SerializeField] private float gridPadding = 5.0f;
+    
+    [Tooltip("Visual buffer around the grid (percentage of grid size)")]
+    [SerializeField] private float viewBuffer = 0.1f; // 10% extra view area
     
     #endregion
 
@@ -79,6 +86,19 @@ public class MapBounds : MonoBehaviour
             Debug.LogError("No main camera found! MapBounds requires a camera tagged as 'MainCamera'.");
             enabled = false;
             return;
+        }
+        
+        // Find grid manager if not assigned
+        if (gridManager == null)
+        {
+            gridManager = FindFirstObjectByType<GridManager>();
+            
+            if (gridManager == null)
+            {
+                Debug.LogWarning("GridManager not found! Using default bounds.");
+                _boundsInitialized = true;
+                return;
+            }
         }
         
         // Auto-calculate bounds from GridManager if enabled
@@ -159,27 +179,55 @@ public class MapBounds : MonoBehaviour
     /// </summary>
     public void CalculateBoundsFromGrid()
     {
-        if (GridManager.Instance == null)
+        if (gridManager == null)
         {
             Debug.LogWarning("GridManager not found! Cannot calculate bounds from grid.");
             return;
         }
         
-        // Get grid dimensions
-        int width = GridManager.Instance.Width;
-        int height = GridManager.Instance.Height;
-        float tileSize = GridManager.Instance.TileSize;
+        if (gridManager.gridData == null)
+        {
+            Debug.LogWarning("GridData not found! Cannot calculate bounds from grid.");
+            return;
+        }
         
-        // Calculate bounds with padding
-        minBounds = new Vector2(-gridPadding, -gridPadding);
+        // Get grid dimensions from the grid data
+        int width = gridManager.gridData.Width;
+        int height = gridManager.gridData.Height;
+        float cellSize = gridManager.gridData.CellSize;
+        Vector3 mapOrigin = gridManager.gridData.MapOrigin;
+        
+        // Calculate total grid size
+        float gridWidth = width * cellSize;
+        float gridHeight = height * cellSize;
+        
+        // Add buffer space for better visibility beyond the edge
+        float bufferX = gridWidth * viewBuffer;
+        float bufferZ = gridHeight * viewBuffer;
+        
+        // Calculate bounds with padding and buffer
+        minBounds = new Vector2(
+            mapOrigin.x - gridPadding - bufferX,
+            mapOrigin.z - gridPadding - bufferZ
+        );
+        
         maxBounds = new Vector2(
-            width * tileSize + gridPadding,
-            height * tileSize + gridPadding
+            mapOrigin.x + gridWidth + gridPadding + bufferX,
+            mapOrigin.z + gridHeight + gridPadding + bufferZ
         );
         
         _boundsInitialized = true;
         
         Debug.Log($"Camera bounds calculated from grid: Min: {minBounds}, Max: {maxBounds}");
+    }
+    
+    /// <summary>
+    /// Tests if a position is within bounds
+    /// </summary>
+    public bool IsPositionInBounds(Vector3 position)
+    {
+        return position.x >= minBounds.x && position.x <= maxBounds.x &&
+               position.z >= minBounds.y && position.z <= maxBounds.y;
     }
     
     #endregion
