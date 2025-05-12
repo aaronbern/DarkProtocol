@@ -75,23 +75,30 @@ namespace DarkProtocol.Grid
         
         private void OnEnable()
         {
-            // Get serialized properties
-            gridDataProp = serializedObject.FindProperty("gridData");
-            createNewGridOnStartProp = serializedObject.FindProperty("createNewGridOnStart");
-            defaultWidthProp = serializedObject.FindProperty("defaultWidth");
-            defaultHeightProp = serializedObject.FindProperty("defaultHeight");
-            defaultCellSizeProp = serializedObject.FindProperty("defaultCellSize");
-            showGridInEditorProp = serializedObject.FindProperty("showGridInEditor");
-            showGridInGameProp = serializedObject.FindProperty("showGridInGame");
-            gridLineColorProp = serializedObject.FindProperty("gridLineColor");
-            gridLineWidthProp = serializedObject.FindProperty("gridLineWidth");
-            movementRangeMaterialProp = serializedObject.FindProperty("movementRangeMaterial");
-            movementRangeColorProp = serializedObject.FindProperty("movementRangeColor");
-            movementRangeHeightProp = serializedObject.FindProperty("movementRangeHeight");
-            gridParentProp = serializedObject.FindProperty("gridParent");
-            mainCameraProp = serializedObject.FindProperty("mainCamera");
-            enableDebugViewProp = serializedObject.FindProperty("enableDebugView");
-            showPathfindingResultsProp = serializedObject.FindProperty("showPathfindingResults");
+            // Get serialized properties safely
+            try
+            {
+                gridDataProp = serializedObject.FindProperty("gridData");
+                createNewGridOnStartProp = serializedObject.FindProperty("createNewGridOnStart");
+                defaultWidthProp = serializedObject.FindProperty("defaultWidth");
+                defaultHeightProp = serializedObject.FindProperty("defaultHeight");
+                defaultCellSizeProp = serializedObject.FindProperty("defaultCellSize");
+                showGridInEditorProp = serializedObject.FindProperty("showGridInEditor");
+                showGridInGameProp = serializedObject.FindProperty("showGridInGame");
+                gridLineColorProp = serializedObject.FindProperty("gridLineColor");
+                gridLineWidthProp = serializedObject.FindProperty("gridLineWidth");
+                movementRangeMaterialProp = serializedObject.FindProperty("movementRangeMaterial");
+                movementRangeColorProp = serializedObject.FindProperty("movementRangeColor");
+                movementRangeHeightProp = serializedObject.FindProperty("movementRangeHeight");
+                gridParentProp = serializedObject.FindProperty("gridParent");
+                mainCameraProp = serializedObject.FindProperty("mainCamera");
+                enableDebugViewProp = serializedObject.FindProperty("enableDebugView");
+                showPathfindingResultsProp = serializedObject.FindProperty("showPathfindingResults");
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"Failed to find some serialized properties: {e.Message}");
+            }
             
             // Register for scene view events
             SceneView.duringSceneGui += OnSceneViewGUI;
@@ -103,6 +110,15 @@ namespace DarkProtocol.Grid
             SceneView.duringSceneGui -= OnSceneViewGUI;
         }
         
+        // Helper method to safely display a property field
+        private void SafePropertyField(SerializedProperty property)
+        {
+            if (property != null)
+            {
+                EditorGUILayout.PropertyField(property);
+            }
+        }
+        
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
@@ -112,16 +128,16 @@ namespace DarkProtocol.Grid
             // General grid settings
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Grid Data", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(gridDataProp);
+            SafePropertyField(gridDataProp);
             
             // New grid settings
-            EditorGUILayout.PropertyField(createNewGridOnStartProp);
-            if (createNewGridOnStartProp.boolValue)
+            SafePropertyField(createNewGridOnStartProp);
+            if (createNewGridOnStartProp != null && createNewGridOnStartProp.boolValue)
             {
                 EditorGUI.indentLevel++;
-                EditorGUILayout.PropertyField(defaultWidthProp);
-                EditorGUILayout.PropertyField(defaultHeightProp);
-                EditorGUILayout.PropertyField(defaultCellSizeProp);
+                SafePropertyField(defaultWidthProp);
+                SafePropertyField(defaultHeightProp);
+                SafePropertyField(defaultCellSizeProp);
                 EditorGUI.indentLevel--;
             }
             
@@ -142,29 +158,29 @@ namespace DarkProtocol.Grid
             // Visualization settings
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Visualization Settings", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(showGridInEditorProp);
-            EditorGUILayout.PropertyField(showGridInGameProp);
-            EditorGUILayout.PropertyField(gridLineColorProp);
-            EditorGUILayout.PropertyField(gridLineWidthProp);
+            SafePropertyField(showGridInEditorProp);
+            SafePropertyField(showGridInGameProp);
+            SafePropertyField(gridLineColorProp);
+            SafePropertyField(gridLineWidthProp);
             
             // Movement range visualization
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Movement Range Visualization", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(movementRangeMaterialProp);
-            EditorGUILayout.PropertyField(movementRangeColorProp);
-            EditorGUILayout.PropertyField(movementRangeHeightProp);
+            SafePropertyField(movementRangeMaterialProp);
+            SafePropertyField(movementRangeColorProp);
+            SafePropertyField(movementRangeHeightProp);
             
             // Object references
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Object References", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(gridParentProp);
-            EditorGUILayout.PropertyField(mainCameraProp);
+            SafePropertyField(gridParentProp);
+            SafePropertyField(mainCameraProp);
             
             // Debug settings
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Debug Settings", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(enableDebugViewProp);
-            EditorGUILayout.PropertyField(showPathfindingResultsProp);
+            SafePropertyField(enableDebugViewProp);
+            SafePropertyField(showPathfindingResultsProp);
             
             // Grid editing tools
             EditorGUILayout.Space();
@@ -552,13 +568,28 @@ namespace DarkProtocol.Grid
         private void OnEnable()
         {
             // Find properties
-            widthProp = serializedObject.FindProperty("width");
-            heightProp = serializedObject.FindProperty("height");
-            cellSizeProp = serializedObject.FindProperty("cellSize");
-            mapOriginProp = serializedObject.FindProperty("mapOrigin");
-            chunkSizeProp = serializedObject.FindProperty("chunkSize");
-            maxVisibleDistanceProp = serializedObject.FindProperty("maxVisibleDistance");
-            updateBudgetPerFrameProp = serializedObject.FindProperty("updateBudgetPerFrame");
+            try
+            {
+                widthProp = serializedObject.FindProperty("width");
+                heightProp = serializedObject.FindProperty("height");
+                cellSizeProp = serializedObject.FindProperty("cellSize");
+                mapOriginProp = serializedObject.FindProperty("mapOrigin");
+                chunkSizeProp = serializedObject.FindProperty("chunkSize");
+                maxVisibleDistanceProp = serializedObject.FindProperty("maxVisibleDistance");
+                updateBudgetPerFrameProp = serializedObject.FindProperty("updateBudgetPerFrame");
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"Failed to find some serialized properties: {e.Message}");
+            }
+        }
+        
+        private void SafePropertyField(SerializedProperty property)
+        {
+            if (property != null)
+            {
+                EditorGUILayout.PropertyField(property);
+            }
         }
         
         public override void OnInspectorGUI()
@@ -576,13 +607,16 @@ namespace DarkProtocol.Grid
             showGridSettings = EditorGUILayout.Foldout(showGridSettings, "Grid Settings", true, EditorStyles.foldoutHeader);
             if (showGridSettings)
             {
-                EditorGUILayout.PropertyField(widthProp);
-                EditorGUILayout.PropertyField(heightProp);
-                EditorGUILayout.PropertyField(cellSizeProp);
-                EditorGUILayout.PropertyField(mapOriginProp);
+                SafePropertyField(widthProp);
+                SafePropertyField(heightProp);
+                SafePropertyField(cellSizeProp);
+                SafePropertyField(mapOriginProp);
                 
                 EditorGUILayout.Space();
-                EditorGUILayout.LabelField($"Total Tiles: {widthProp.intValue * heightProp.intValue}");
+                if (widthProp != null && heightProp != null)
+                {
+                    EditorGUILayout.LabelField($"Total Tiles: {widthProp.intValue * heightProp.intValue}");
+                }
             }
             
             // Optimization settings
@@ -590,14 +624,17 @@ namespace DarkProtocol.Grid
             showOptimizationSettings = EditorGUILayout.Foldout(showOptimizationSettings, "Optimization Settings", true, EditorStyles.foldoutHeader);
             if (showOptimizationSettings)
             {
-                EditorGUILayout.PropertyField(chunkSizeProp);
-                EditorGUILayout.PropertyField(maxVisibleDistanceProp);
-                EditorGUILayout.PropertyField(updateBudgetPerFrameProp);
+                SafePropertyField(chunkSizeProp);
+                SafePropertyField(maxVisibleDistanceProp);
+                SafePropertyField(updateBudgetPerFrameProp);
                 
                 EditorGUILayout.Space();
-                int chunksX = Mathf.CeilToInt((float)widthProp.intValue / chunkSizeProp.intValue);
-                int chunksZ = Mathf.CeilToInt((float)heightProp.intValue / chunkSizeProp.intValue);
-                EditorGUILayout.LabelField($"Chunks: {chunksX}x{chunksZ} = {chunksX * chunksZ} total");
+                if (widthProp != null && heightProp != null && chunkSizeProp != null)
+                {
+                    int chunksX = Mathf.CeilToInt((float)widthProp.intValue / chunkSizeProp.intValue);
+                    int chunksZ = Mathf.CeilToInt((float)heightProp.intValue / chunkSizeProp.intValue);
+                    EditorGUILayout.LabelField($"Chunks: {chunksX}x{chunksZ} = {chunksX * chunksZ} total");
+                }
             }
             
             // Import/Export
