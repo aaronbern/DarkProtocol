@@ -164,7 +164,7 @@ MonoBehaviour:
   movementRangeColor: {r: 0.2, g: 0.8, b: 0.4, a: 0.5}
   pathPreviewColor: {r: 1, g: 0.8, b: 0.2, a: 0.7}
   gridParent: {fileID: 0}
-  mainCamera: {fileID: 0}
+  mainCamera: {fileID: 1904866470}
   gridOverlaySystem: {fileID: 0}
   enableDebugView: 0
   showPathfindingResults: 1
@@ -261,6 +261,8 @@ MonoBehaviour:
   enableEdgeHighlight: 1
   edgeHighlightWidth: 0.05
   renderLayer: 31
+  createInteractionColliders: 1
+  interactionColliderLayer: 10
 --- !u!1 &146320834
 GameObject:
   m_ObjectHideFlags: 0
@@ -495,7 +497,7 @@ MonoBehaviour:
   team: 0
   maxHealth: 100
   maxActionPoints: 3
-  maxMovementPoints: 5
+  maxMovementPoints: 10
   selectionIndicator: {fileID: 0}
 --- !u!65 &1007492498
 BoxCollider:
@@ -635,7 +637,7 @@ MonoBehaviour:
   team: 0
   maxHealth: 100
   maxActionPoints: 3
-  maxMovementPoints: 5
+  maxMovementPoints: 10
   selectionIndicator: {fileID: 0}
 --- !u!65 &1017706401
 BoxCollider:
@@ -841,6 +843,8 @@ MonoBehaviour:
   maxZoomDistance: 30
   groundHeight: 0
   zoomAlongForwardAxis: 1
+  minPitchAngle: 30
+  maxPitchAngle: 65
   rotationSpeed: 90
   rotationAcceleration: 15
   rotationDeceleration: 20

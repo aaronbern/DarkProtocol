@@ -48,6 +48,13 @@ public class TacticalCameraController : MonoBehaviour
 
     [Tooltip("Whether to zoom along camera forward axis or directly up/down")]
     [SerializeField] private bool zoomAlongForwardAxis = true;
+    
+    [Tooltip("Minimum pitch angle (when zoomed in)")]
+    [SerializeField] private float minPitchAngle = 30f;
+
+    [Tooltip("Maximum pitch angle (when zoomed out)")]
+    [SerializeField] private float maxPitchAngle = 65f;
+
 
     [Header("Rotation Settings")]
     [Tooltip("Camera rotation speed (degrees per second)")]
@@ -122,6 +129,12 @@ public class TacticalCameraController : MonoBehaviour
         {
             UpdateFocusPoint();
         }
+        float t = Mathf.InverseLerp(minZoomDistance, maxZoomDistance, targetZoomDistance);
+        float pitch = Mathf.Lerp(maxPitchAngle, minPitchAngle, t);
+
+        Vector3 angles = cameraTransform.eulerAngles;
+        angles.x = pitch;
+        cameraTransform.eulerAngles = angles;
     }
 
     #endregion

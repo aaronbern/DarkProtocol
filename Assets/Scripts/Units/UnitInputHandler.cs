@@ -115,11 +115,23 @@ public class UnitInputHandler : MonoBehaviour
             if (clickedUnit != null)
             {
                 Debug.Log($"Clicked on unit: {clickedUnit.UnitName}");
-                
+                 
+                 
                 // Forward the click to the UnitSelectionController
                 if (UnitSelectionController.Instance != null)
                 {
                     UnitSelectionController.Instance.HandleUnitClicked(clickedUnit);
+                    
+                    // ADDED: Also notify GridManager directly
+                    if (DarkProtocol.Grid.GridManager.Instance != null)
+                    {
+                        Debug.Log($"Directly notifying GridManager about unit selection: {clickedUnit.UnitName}");
+                        DarkProtocol.Grid.GridManager.Instance.OnUnitSelected(clickedUnit);
+                    }
+                    else
+                    {
+                        Debug.LogError("GridManager.Instance is null! Make sure it exists in the scene.");
+                    }
                 }
                 else
                 {

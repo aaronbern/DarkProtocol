@@ -7,6 +7,7 @@ using UnityEngine.Rendering.Universal;
 /// <summary>
 /// Handles visual overlay rendering for the grid system, showing movement ranges and paths.
 /// Uses GPU-based mesh rendering for efficiency without spawning GameObjects.
+/// Also provides a hybrid approach with invisible colliders for interaction.
 /// </summary>
 public class GridOverlaySystem : MonoBehaviour
 {
@@ -50,6 +51,13 @@ public class GridOverlaySystem : MonoBehaviour
     
     [Tooltip("The layer to render the overlays on")]
     [SerializeField] private int renderLayer = 31; // Default to last layer
+    
+    [Header("Interaction Settings")]
+    [Tooltip("Whether to create colliders for interaction")]
+    [SerializeField] private bool createInteractionColliders = true;
+    
+    [Tooltip("Layer for the interaction colliders")]
+    [SerializeField] private int interactionColliderLayer = 10; // Adjust as needed
     #endregion
 
     #region Private Variables
@@ -79,6 +87,10 @@ public class GridOverlaySystem : MonoBehaviour
     
     // Animation timing
     private float _animationTime = 0f;
+    
+    // Dictionary to track interaction colliders
+    private Dictionary<Vector2Int, GameObject> _interactionColliders = new Dictionary<Vector2Int, GameObject>();
+    private GameObject _collidersParent;
     #endregion
 
     #region Unity Lifecycle
@@ -98,6 +110,10 @@ public class GridOverlaySystem : MonoBehaviour
         
         // Initialize materials
         InitializeMaterials();
+        
+        // Create parent for colliders
+        _collidersParent = new GameObject("MovementRangeColliders");
+        _collidersParent.transform.SetParent(transform);
     }
 
     private void OnEnable()
@@ -159,6 +175,18 @@ public class GridOverlaySystem : MonoBehaviour
                 Destroy(_overlayMesh);
             else
                 DestroyImmediate(_overlayMesh);
+        }
+        
+        // Clean up colliders
+        CleanupInteractionColliders();
+        
+        // Clean up parent
+        if (_collidersParent != null)
+        {
+            if (Application.isPlaying)
+                Destroy(_collidersParent);
+            else
+                DestroyImmediate(_collidersParent);
         }
     }
 
@@ -230,6 +258,9 @@ public class GridOverlaySystem : MonoBehaviour
             // Create instance of the provided material to avoid modifying original
             _movementRangeMaterialInstance = new Material(movementRangeMaterial);
             _movementRangeMaterialInstance.color = movementRangeColor;
+            
+            // Make sure instancing is enabled even on provided materials
+            _movementRangeMaterialInstance.enableInstancing = true;
         }
         
         // Create path preview material if not provided
@@ -242,6 +273,9 @@ public class GridOverlaySystem : MonoBehaviour
             // Create instance of the provided material to avoid modifying original
             _pathPreviewMaterialInstance = new Material(pathPreviewMaterial);
             _pathPreviewMaterialInstance.color = pathPreviewColor;
+            
+            // Make sure instancing is enabled even on provided materials
+            _pathPreviewMaterialInstance.enableInstancing = true;
         }
         
         // Setup material properties
@@ -265,7 +299,10 @@ public class GridOverlaySystem : MonoBehaviour
         
         // Configure material properties
         material.color = color;
+        
+        // THIS IS THE IMPORTANT PART - Enable GPU instancing
         material.enableInstancing = true;
+        
         material.renderQueue = (int)RenderQueue.Transparent;
         
         // Set up transparency
@@ -301,12 +338,21 @@ public class GridOverlaySystem : MonoBehaviour
             InitializeMaterials();
         }
         
+        // Clear existing movement range visuals
+        ClearMovementRange();
+        
         // Cache positions
         _currentMovementRangePositions.Clear();
         _currentMovementRangePositions.AddRange(positions);
         
-        // Set visibility
+        // Set visibility for GPU instancing
         _isVisible = true;
+        
+        // Create invisible colliders for interaction if enabled
+        if (createInteractionColliders)
+        {
+            CreateInteractionColliders(positions);
+        }
     }
 
     /// <summary>
@@ -342,6 +388,9 @@ public class GridOverlaySystem : MonoBehaviour
     {
         _currentMovementRangePositions.Clear();
         UpdateVisibility();
+        
+        // Clean up colliders
+        CleanupInteractionColliders();
     }
 
     /// <summary>
@@ -361,6 +410,9 @@ public class GridOverlaySystem : MonoBehaviour
         _currentMovementRangePositions.Clear();
         _currentPathPositions.Clear();
         _isVisible = false;
+        
+        // Clean up colliders
+        CleanupInteractionColliders();
     }
 
     /// <summary>
@@ -410,71 +462,91 @@ public class GridOverlaySystem : MonoBehaviour
         
         float cellSize = gridManager.gridData.CellSize;
         
-        // Batch rendering preparation
-        Matrix4x4[] movementMatrices = new Matrix4x4[_currentMovementRangePositions.Count];
-        Matrix4x4[] pathMatrices = new Matrix4x4[_currentPathPositions.Count];
-        int movementCount = 0;
-        int pathCount = 0;
-        
-        // Prepare movement range matrices
-        foreach (Vector2Int pos in _currentMovementRangePositions)
+        try
         {
-            // Skip if this position is also in the path (path takes precedence)
-            if (_currentPathPositions.Contains(pos)) continue;
+            // Batch rendering preparation
+            Matrix4x4[] movementMatrices = new Matrix4x4[_currentMovementRangePositions.Count];
+            Matrix4x4[] pathMatrices = new Matrix4x4[_currentPathPositions.Count];
+            int movementCount = 0;
+            int pathCount = 0;
             
-            Vector3 worldPos = gridManager.GridToWorldPosition(pos);
-            worldPos.y += overlayHeight;
-            
-            movementMatrices[movementCount++] = Matrix4x4.TRS(
-                worldPos, 
-                Quaternion.Euler(90, 0, 0), 
-                Vector3.one * cellSize);
+            // Prepare movement range matrices
+            foreach (Vector2Int pos in _currentMovementRangePositions)
+            {
+                // Skip if this position is also in the path (path takes precedence)
+                if (_currentPathPositions.Contains(pos)) continue;
                 
-            // Draw in batches of 1023 (Graphics.DrawMeshInstanced limit)
-            if (movementCount == 1023)
+                Vector3 worldPos = gridManager.GridToWorldPosition(pos);
+                worldPos.y += overlayHeight;
+                
+                movementMatrices[movementCount++] = Matrix4x4.TRS(
+                    worldPos, 
+                    Quaternion.identity, 
+                    Vector3.one * cellSize);
+                    
+                // Draw in batches of 1023 (Graphics.DrawMeshInstanced limit)
+                if (movementCount == 1023)
+                {
+                    Graphics.DrawMeshInstanced(_overlayMesh, 0, _movementRangeMaterialInstance, 
+                        movementMatrices, movementCount, _propertyBlock, ShadowCastingMode.Off, 
+                        false, renderLayer);
+                    movementCount = 0;
+                }
+            }
+            
+            // Draw any remaining movement tiles
+            if (movementCount > 0 && _movementRangeMaterialInstance != null)
             {
                 Graphics.DrawMeshInstanced(_overlayMesh, 0, _movementRangeMaterialInstance, 
                     movementMatrices, movementCount, _propertyBlock, ShadowCastingMode.Off, 
                     false, renderLayer);
-                movementCount = 0;
             }
-        }
-        
-        // Draw any remaining movement tiles
-        if (movementCount > 0 && _movementRangeMaterialInstance != null)
-        {
-            Graphics.DrawMeshInstanced(_overlayMesh, 0, _movementRangeMaterialInstance, 
-                movementMatrices, movementCount, _propertyBlock, ShadowCastingMode.Off, 
-                false, renderLayer);
-        }
-        
-        // Prepare path matrices
-        foreach (Vector2Int pos in _currentPathPositions)
-        {
-            Vector3 worldPos = gridManager.GridToWorldPosition(pos);
-            worldPos.y += overlayHeight * 1.1f; // Slightly higher to avoid z-fighting
             
-            pathMatrices[pathCount++] = Matrix4x4.TRS(
-                worldPos, 
-                Quaternion.Euler(90, 0, 0), 
-                Vector3.one * cellSize);
+            // Prepare path matrices
+            foreach (Vector2Int pos in _currentPathPositions)
+            {
+                Vector3 worldPos = gridManager.GridToWorldPosition(pos);
+                worldPos.y += overlayHeight * 1.1f; // Slightly higher to avoid z-fighting
                 
-            // Draw in batches of 1023 (Graphics.DrawMeshInstanced limit)
-            if (pathCount == 1023)
+                pathMatrices[pathCount++] = Matrix4x4.TRS(
+                    worldPos, 
+                    Quaternion.identity, 
+                    Vector3.one * cellSize);
+                    
+                // Draw in batches of 1023 (Graphics.DrawMeshInstanced limit)
+                if (pathCount == 1023)
+                {
+                    Graphics.DrawMeshInstanced(_overlayMesh, 0, _pathPreviewMaterialInstance, 
+                        pathMatrices, pathCount, _propertyBlock, ShadowCastingMode.Off, 
+                        false, renderLayer);
+                    pathCount = 0;
+                }
+            }
+            
+            // Draw any remaining path tiles
+            if (pathCount > 0 && _pathPreviewMaterialInstance != null)
             {
                 Graphics.DrawMeshInstanced(_overlayMesh, 0, _pathPreviewMaterialInstance, 
                     pathMatrices, pathCount, _propertyBlock, ShadowCastingMode.Off, 
                     false, renderLayer);
-                pathCount = 0;
             }
         }
-        
-        // Draw any remaining path tiles
-        if (pathCount > 0 && _pathPreviewMaterialInstance != null)
+        catch (System.InvalidOperationException ex)
         {
-            Graphics.DrawMeshInstanced(_overlayMesh, 0, _pathPreviewMaterialInstance, 
-                pathMatrices, pathCount, _propertyBlock, ShadowCastingMode.Off, 
-                false, renderLayer);
+            // Handle instancing exception and log it once
+            if (ex.Message.Contains("enable instancing"))
+            {
+                Debug.LogError("Material instancing error: " + ex.Message + 
+                    "\nFallback to non-instanced rendering. Performance will be reduced.");
+                
+                // Disable instancing rendering after error
+                _isVisible = false;
+            }
+            else
+            {
+                // Rethrow other exceptions
+                throw;
+            }
         }
     }
 
@@ -486,4 +558,75 @@ public class GridOverlaySystem : MonoBehaviour
         _isVisible = (_currentMovementRangePositions.Count > 0 || _currentPathPositions.Count > 0);
     }
     #endregion
+    
+    #region Interaction Colliders
+    /// <summary>
+    /// Creates invisible colliders for interaction with movement range tiles
+    /// </summary>
+    /// <param name="positions">List of grid positions to create colliders for</param>
+    private void CreateInteractionColliders(List<Vector2Int> positions)
+    {
+        // Clean up existing colliders
+        CleanupInteractionColliders();
+        
+        // Get reference to GridManager
+        var gridManager = GridManager.Instance;
+        if (gridManager == null) return;
+        
+        // Create colliders for each position
+        foreach (Vector2Int pos in positions)
+        {
+            // Get world position
+            Vector3 worldPos = gridManager.GridToWorldPosition(pos);
+            worldPos.y += 0.01f; // Very slightly above ground
+            
+            // Create GameObject with BoxCollider but no renderer
+            GameObject colliderObj = new GameObject($"Collider_{pos.x}_{pos.y}");
+            colliderObj.transform.position = worldPos;
+            colliderObj.transform.SetParent(_collidersParent.transform);
+            colliderObj.layer = interactionColliderLayer;
+            
+            // Add BoxCollider sized to match the cell
+            BoxCollider collider = colliderObj.AddComponent<BoxCollider>();
+            collider.size = new Vector3(gridManager.gridData.CellSize * 0.9f, 0.1f, gridManager.gridData.CellSize * 0.9f);
+            collider.isTrigger = true; // Make it a trigger so it doesn't affect physics
+            
+            // Add a custom component to store the grid position for easy lookup
+            GridPositionMarker marker = colliderObj.AddComponent<GridPositionMarker>();
+            marker.GridPosition = pos;
+            
+            // Store in dictionary for easy access and cleanup
+            _interactionColliders[pos] = colliderObj;
+        }
+        
+        Debug.Log($"Created {_interactionColliders.Count} interaction colliders for movement range");
+    }
+    
+    /// <summary>
+    /// Cleans up all interaction colliders
+    /// </summary>
+    private void CleanupInteractionColliders()
+    {
+        // Clean up colliders
+        foreach (var collider in _interactionColliders.Values)
+        {
+            if (collider != null)
+            {
+                if (Application.isPlaying)
+                    Destroy(collider);
+                else
+                    DestroyImmediate(collider);
+            }
+        }
+        _interactionColliders.Clear();
+    }
+    #endregion
+}
+
+/// <summary>
+/// Simple component to store grid position data on interaction colliders
+/// </summary>
+public class GridPositionMarker : MonoBehaviour
+{
+    public Vector2Int GridPosition;
 }

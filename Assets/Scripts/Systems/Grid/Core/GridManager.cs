@@ -5,7 +5,7 @@ namespace DarkProtocol.Grid
 {
     /// <summary>
     /// Core manager for the grid system. Handles initialization, interactions, and integration with game systems.
-    /// Replaces the old GameObject-based grid system with a more efficient data-driven approach.
+    /// Uses a data-driven approach with efficient grid overlay visualizations.
     /// </summary>
     public class GridManager : MonoBehaviour
     {
@@ -126,29 +126,8 @@ namespace DarkProtocol.Grid
                 _lastCameraPosition = mainCamera.transform.position;
             }
             
-            // Get reference to GridOverlaySystem if not already set
-            if (gridOverlaySystem == null)
-            {
-                gridOverlaySystem = GetComponent<GridOverlaySystem>();
-                
-                if (gridOverlaySystem == null)
-                {
-                    gridOverlaySystem = FindFirstObjectByType<GridOverlaySystem>();
-                    
-                    if (gridOverlaySystem == null && Application.isPlaying)
-                    {
-                        // Create the overlay system component if it doesn't exist
-                        gridOverlaySystem = gameObject.AddComponent<GridOverlaySystem>();
-                    }
-                }
-            }
-            
-            // Set colors on the grid overlay system
-            if (gridOverlaySystem != null)
-            {
-                gridOverlaySystem.SetMovementRangeColor(movementRangeColor);
-                gridOverlaySystem.SetPathPreviewColor(pathPreviewColor);
-            }
+            // Set up grid overlay system
+            SetupGridOverlaySystem();
         }
         
         private void Update()
@@ -202,6 +181,41 @@ namespace DarkProtocol.Grid
                 gridData.Initialize();
                 
                 Debug.Log($"Grid Manager initialized with grid: {gridData.Width}x{gridData.Height}");
+            }
+        }
+        
+        /// <summary>
+        /// Set up the grid overlay system
+        /// </summary>
+        private void SetupGridOverlaySystem()
+        {
+            // Get reference to GridOverlaySystem if not already set
+            if (gridOverlaySystem == null)
+            {
+                gridOverlaySystem = GetComponent<GridOverlaySystem>();
+                
+                if (gridOverlaySystem == null)
+                {
+                    gridOverlaySystem = FindFirstObjectByType<GridOverlaySystem>();
+                    
+                    if (gridOverlaySystem == null && Application.isPlaying)
+                    {
+                        // Create the overlay system component if it doesn't exist
+                        Debug.Log("Creating GridOverlaySystem component");
+                        gridOverlaySystem = gameObject.AddComponent<GridOverlaySystem>();
+                    }
+                }
+            }
+            
+            // Set colors on the grid overlay system
+            if (gridOverlaySystem != null)
+            {
+                gridOverlaySystem.SetMovementRangeColor(movementRangeColor);
+                gridOverlaySystem.SetPathPreviewColor(pathPreviewColor);
+            }
+            else
+            {
+                Debug.LogWarning("GridOverlaySystem not available. Movement range visualization will not work!");
             }
         }
         
@@ -327,7 +341,6 @@ namespace DarkProtocol.Grid
             Vector3 centeredOrigin = new Vector3(-width/2f, 0, -height/2f);
             
             // Update the origin in the grid data
-            // This assumes you have a way to set the MapOrigin property
             var originField = gridData.GetType().GetField("mapOrigin", 
                 System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
                 
@@ -443,6 +456,20 @@ namespace DarkProtocol.Grid
             if (gridOverlaySystem != null)
             {
                 gridOverlaySystem.ShowMovementRange(_currentMovementRange);
+                Debug.Log($"Showing movement range for {unit.UnitName}: {_currentMovementRange.Count} tiles");
+            }
+            else
+            {
+                Debug.LogWarning("GridOverlaySystem not found! Cannot show movement range.");
+                
+                // Try to find or create it
+                SetupGridOverlaySystem();
+                
+                // Try again if we got it
+                if (gridOverlaySystem != null)
+                {
+                    gridOverlaySystem.ShowMovementRange(_currentMovementRange);
+                }
             }
             
             return _currentMovementRange;
@@ -480,6 +507,20 @@ namespace DarkProtocol.Grid
             if (gridOverlaySystem != null)
             {
                 gridOverlaySystem.ShowPathPreview(_currentPath);
+                Debug.Log($"Showing path preview: {_currentPath.Count} tiles");
+            }
+            else
+            {
+                Debug.LogWarning("GridOverlaySystem not found! Cannot show path preview.");
+                
+                // Try to find or create it
+                SetupGridOverlaySystem();
+                
+                // Try again if we got it
+                if (gridOverlaySystem != null)
+                {
+                    gridOverlaySystem.ShowPathPreview(_currentPath);
+                }
             }
         }
         
@@ -611,6 +652,8 @@ namespace DarkProtocol.Grid
         /// </summary>
         public void OnUnitSelected(Unit unit)
         {
+            Debug.Log($"Unit selected: {(unit != null ? unit.UnitName : "None")}");
+            
             // Clear any existing movement range
             ClearMovementRange();
             ClearPathVisualization();
@@ -625,56 +668,124 @@ namespace DarkProtocol.Grid
         }
         
         /// <summary>
-        /// Handle unit movement input
+        /// Handle unit movement input using the new Input System and hybrid interaction system
         /// </summary>
         private void HandleUnitMovementInput()
         {
             if (_selectedUnit == null)
                 return;
-                
-            // Check for mouse input
-            if (Input.GetMouseButtonDown(0))
+            
+            // Get reference to Mouse from Input System
+            var mouse = UnityEngine.InputSystem.Mouse.current;
+            if (mouse == null)
+                return;
+            
+            // Check for right mouse button click (movement command)
+            if (mouse.rightButton.wasPressedThisFrame)
             {
+                Debug.Log("Right click detected - attempting movement");
+                
                 // Cast ray from mouse position
-                Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
+                Vector2 mousePosition = mouse.position.ReadValue();
+                Ray ray = mainCamera.ScreenPointToRay(mousePosition);
+                
                 if (Physics.Raycast(ray, out RaycastHit hit))
                 {
-                    // Convert hit point to grid position
-                    if (WorldToGridPosition(hit.point, out Vector2Int gridPos))
+                    Debug.Log($"Hit object: {hit.collider.gameObject.name}");
+                    
+                    // Check if we hit a movement range collider
+                    GridPositionMarker marker = hit.collider.GetComponent<GridPositionMarker>();
+                    if (marker != null)
                     {
-                        // Check if this is a valid movement tile
-                        if (_currentMovementRange.Contains(gridPos))
+                        Vector2Int gridPos = marker.GridPosition;
+                        Debug.Log($"Clicked on movement tile at grid position: {gridPos}");
+                        
+                        // Move the unit
+                        MoveUnitToPosition(_selectedUnit, gridPos);
+                    }
+                    else
+                    {
+                        // Try to convert hit point to grid position as fallback
+                        if (WorldToGridPosition(hit.point, out Vector2Int gridPos))
                         {
-                            // Move the unit
-                            MoveUnitToPosition(_selectedUnit, gridPos);
+                            // Check if this is a valid movement tile
+                            if (_currentMovementRange.Contains(gridPos))
+                            {
+                                Debug.Log($"Moving unit to grid position: {gridPos}");
+                                // Move the unit
+                                MoveUnitToPosition(_selectedUnit, gridPos);
+                            }
+                            else
+                            {
+                                Debug.Log($"Position {gridPos} is not in movement range");
+                            }
+                        }
+                        else
+                        {
+                            Debug.Log("Could not convert hit point to valid grid position");
                         }
                     }
                 }
+                else
+                {
+                    Debug.Log("Right-click raycast did not hit anything");
+                }
             }
             
-            // If mouse is hovering over a tile, show the path to it
-            if (Input.GetMouseButton(0) == false) // Only when not clicking
+            // For hover path preview (only when not pressing any mouse button)
+            if (!mouse.leftButton.isPressed && !mouse.rightButton.isPressed)
             {
-                Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
+                Vector2 mousePosition = mouse.position.ReadValue();
+                Ray ray = mainCamera.ScreenPointToRay(mousePosition);
+                
                 if (Physics.Raycast(ray, out RaycastHit hit))
                 {
-                    // Convert hit point to grid position
-                    if (WorldToGridPosition(hit.point, out Vector2Int hoverPos))
+                    // Check if we hit a GridPositionMarker
+                    GridPositionMarker marker = hit.collider.GetComponent<GridPositionMarker>();
+                    if (marker != null)
+                    {
+                        Vector2Int markerPosition = marker.GridPosition;
+                        
+                        // Get the unit's current position
+                        if (GetUnitGridPosition(_selectedUnit, out Vector2Int unitPos))
+                        {
+                            // Calculate and show the path
+                            List<Vector2Int> path = gridData.FindPath(unitPos, markerPosition);
+                            if (path != null && path.Count > 0)
+                            {
+                                VisualizePath(path);
+                                return;
+                            }
+                        }
+                    }
+                    
+                    // Fallback to converting hit point to grid position
+                    if (WorldToGridPosition(hit.point, out Vector2Int rayHitPosition))
                     {
                         // Check if this is in the movement range
-                        if (_currentMovementRange.Contains(hoverPos))
+                        if (_currentMovementRange.Contains(rayHitPosition))
                         {
                             // Calculate path
                             if (GetUnitGridPosition(_selectedUnit, out Vector2Int unitPos))
                             {
-                                List<Vector2Int> path = gridData.FindPath(unitPos, hoverPos);
+                                List<Vector2Int> path = gridData.FindPath(unitPos, rayHitPosition);
                                 if (path != null && path.Count > 0)
                                 {
                                     VisualizePath(path);
                                 }
                             }
                         }
+                        else
+                        {
+                            // Not hovering over movement range, clear path visualization
+                            ClearPathVisualization();
+                        }
                     }
+                }
+                else
+                {
+                    // No hit, clear path visualization
+                    ClearPathVisualization();
                 }
             }
         }
