@@ -46,18 +46,34 @@ namespace DarkProtocol.Grid
             }
             
             // Validate positions
-            if (!_gridService.IsValidPosition(start.x, start.y) || !_gridService.IsValidPosition(end.x, end.y))
+            if (!_gridService.IsValidPosition(start.x, start.y))
             {
-                Debug.LogWarning($"Invalid positions for pathfinding: Start={start}, End={end}");
+                Debug.LogWarning($"Invalid start position for pathfinding: {start}");
                 return null;
             }
             
-            // Check if end is walkable (if not, there's no way to path to it)
-            TileData endTile = _gridService.GridData.GetTileData(end);
-            if (endTile != null && !endTile.IsWalkable && !ignoreOccupied)
+            if (!_gridService.IsValidPosition(end.x, end.y))
             {
-                Debug.LogWarning($"End position is not walkable: {end}");
+                Debug.LogWarning($"Invalid end position for pathfinding: {end}");
                 return null;
+            }
+            
+            // Check if end is walkable and not occupied (unless ignoring occupancy)
+            TileData endTile = _gridService.GridData.GetTileData(end);
+            if (endTile != null) 
+            {
+                if (!endTile.IsWalkable)
+                {
+                    Debug.LogWarning($"End position is not walkable: {end}");
+                    return null;
+                }
+                
+                if (endTile.IsOccupied && !ignoreOccupied)
+                {
+                    var occupant = _gridService.GridData.GetOccupant(end.x, end.y);
+                    Debug.LogWarning($"End position {end} is occupied by: {(occupant ? occupant.name : "unknown")}");
+                    return null;
+                }
             }
             
             // Special case: If start and end are the same, return just the start
@@ -70,6 +86,7 @@ namespace DarkProtocol.Grid
             string cacheKey = $"{start.x},{start.y}_{end.x},{end.y}_{ignoreOccupied}";
             if (_pathCache.TryGetValue(cacheKey, out List<Vector2Int> cachedPath))
             {
+                Debug.Log($"Using cached path from {start} to {end}");
                 return new List<Vector2Int>(cachedPath); // Return copy to prevent modifications
             }
             
@@ -103,7 +120,20 @@ namespace DarkProtocol.Grid
             // Cache the result if successful
             if (path != null && path.Count > 1)
             {
+                // Maintain cache size limit by removing oldest entries if needed
+                if (_pathCache.Count >= MaxCacheSize)
+                {
+                    // Simple approach: clear half the cache when it gets full
+                    int toRemove = MaxCacheSize / 2;
+                    List<string> keys = new List<string>(_pathCache.Keys);
+                    for (int i = 0; i < toRemove && i < keys.Count; i++)
+                    {
+                        _pathCache.Remove(keys[i]);
+                    }
+                }
+                
                 _pathCache[cacheKey] = new List<Vector2Int>(path);
+                Debug.Log($"Cached new path from {start} to {end} (cache size: {_pathCache.Count})");
             }
             
             return path;
@@ -191,7 +221,7 @@ namespace DarkProtocol.Grid
                 if (_gridService.IsValidPosition(next.x, next.y))
                 {
                     TileData tile = _gridService.GridData.GetTileData(next);
-                    if (tile != null && (tile.IsWalkable || ignoreOccupied || next == end))
+                    if (tile != null && (tile.IsWalkable && (ignoreOccupied || !tile.IsOccupied || next == end)))
                     {
                         path.Add(next);
                         current = next;
@@ -245,7 +275,7 @@ namespace DarkProtocol.Grid
                 if (_gridService.IsValidPosition(next.x, next.y))
                 {
                     TileData tile = _gridService.GridData.GetTileData(next);
-                    if (tile != null && (tile.IsWalkable || ignoreOccupied || (next.x == end.x && next.y == end.y)))
+                    if (tile != null && (tile.IsWalkable && (ignoreOccupied || !tile.IsOccupied || next == end)))
                     {
                         path.Add(next);
                         current = next;
@@ -259,7 +289,7 @@ namespace DarkProtocol.Grid
                         if (_gridService.IsValidPosition(alternate.x, alternate.y))
                         {
                             TileData altTile = _gridService.GridData.GetTileData(alternate);
-                            if (altTile != null && (altTile.IsWalkable || ignoreOccupied))
+                            if (altTile != null && (altTile.IsWalkable && (ignoreOccupied || !altTile.IsOccupied)))
                             {
                                 path.Add(alternate);
                                 current = alternate;
@@ -290,7 +320,7 @@ namespace DarkProtocol.Grid
                 if (_gridService.IsValidPosition(next.x, next.y))
                 {
                     TileData tile = _gridService.GridData.GetTileData(next);
-                    if (tile != null && (tile.IsWalkable || ignoreOccupied || (next.x == end.x && next.y == end.y)))
+                    if (tile != null && (tile.IsWalkable && (ignoreOccupied || !tile.IsOccupied || next == end)))
                     {
                         path.Add(next);
                         current = next;

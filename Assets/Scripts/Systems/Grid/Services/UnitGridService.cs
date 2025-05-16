@@ -17,6 +17,9 @@ namespace DarkProtocol.Grid
         
         // Current movement range
         private List<Vector2Int> _currentMovementRange = new List<Vector2Int>();
+
+        // Debug flag
+        private bool _showDetailedDebugLogs = false;
         
         /// <summary>
         /// Constructor
@@ -48,7 +51,9 @@ namespace DarkProtocol.Grid
             {
                 // Set tile as occupied
                 _gridService.SetTileOccupied(pos.x, pos.y, true, unit.gameObject);
-                Debug.Log($"Unit {GetUnitDisplayName(unit)} registered at grid position ({pos.x}, {pos.y})");
+                
+                if (_showDetailedDebugLogs)
+                    Debug.Log($"Unit {GetUnitDisplayName(unit)} registered at grid position ({pos.x}, {pos.y})");
             }
         }
         
@@ -85,7 +90,8 @@ namespace DarkProtocol.Grid
         /// <returns>True if movement was successful</returns>
         public bool MoveUnitToPosition(Unit unit, Vector2Int targetPos)
         {
-            Debug.Log($"Attempting to move {unit.name} to position {targetPos}");
+            if (_showDetailedDebugLogs)
+                Debug.Log($"Attempting to move {unit.name} to position {targetPos}");
             
             if (_gridService == null || unit == null)
             {
@@ -100,7 +106,8 @@ namespace DarkProtocol.Grid
                 return false;
             }
             
-            Debug.Log($"Current position: {currentPos}, Target position: {targetPos}, Movement range count: {_currentMovementRange.Count}");
+            if (_showDetailedDebugLogs)
+                Debug.Log($"Current position: {currentPos}, Target position: {targetPos}, Movement range count: {_currentMovementRange.Count}");
             
             // Check if this is a valid movement
             bool isValid = _currentMovementRange.Contains(targetPos);
@@ -108,7 +115,10 @@ namespace DarkProtocol.Grid
             if (!isValid)
             {
                 Debug.LogWarning($"Cannot move unit to position {targetPos} - not in movement range");
-                Debug.Log($"Available positions in range: {string.Join(", ", _currentMovementRange)}");
+                
+                if (_showDetailedDebugLogs)
+                    Debug.Log($"Available positions in range: {string.Join(", ", _currentMovementRange)}");
+                    
                 return false;
             }
             
@@ -124,7 +134,8 @@ namespace DarkProtocol.Grid
                 return false;
             }
             
-            Debug.Log($"Path found with {path.Count} tiles: {string.Join(" -> ", path)}");
+            if (_showDetailedDebugLogs)
+                Debug.Log($"Path found with {path.Count} tiles: {string.Join(" -> ", path)}");
             
             // Calculate movement cost
             float totalCost = _pathfindingService.CalculatePathCost(currentPos, targetPos);
@@ -137,15 +148,29 @@ namespace DarkProtocol.Grid
                 return false;
             }
             
-            // Update occupancy
+            // *** CRITICAL FIX: Update tile occupancy BEFORE moving ***
+            // Clear the start position occupancy
             _gridService.SetTileOccupied(currentPos.x, currentPos.y, false);
-            _gridService.SetTileOccupied(targetPos.x, targetPos.y, true, unit.gameObject);
             
             // Move the unit visually
             Vector3 targetWorldPos = _gridService.GridToWorldPosition(targetPos);
             Debug.Log($"Moving unit to world position: {targetWorldPos}, Cost: {Mathf.RoundToInt(totalCost)}");
+            
+            // Try to move the unit
             bool moveResult = unit.Move(targetWorldPos, Mathf.RoundToInt(totalCost));
             Debug.Log($"Unit.Move result: {moveResult}");
+            
+            // Update occupancy based on movement result
+            if (moveResult)
+            {
+                // Move was successful, mark destination as occupied
+                _gridService.SetTileOccupied(targetPos.x, targetPos.y, true, unit.gameObject);
+            }
+            else
+            {
+                // Move failed, restore original position occupancy
+                _gridService.SetTileOccupied(currentPos.x, currentPos.y, true, unit.gameObject);
+            }
             
             // Clear ranges and paths after movement
             if (_visualizationService != null)
@@ -156,7 +181,7 @@ namespace DarkProtocol.Grid
             
             _currentMovementRange.Clear();
             
-            return true;
+            return moveResult;
         }
         
         /// <summary>

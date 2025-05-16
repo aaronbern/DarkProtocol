@@ -23,8 +23,16 @@ namespace DarkProtocol.Grid
         // Reference to the unit selection controller
         private UnitSelectionController _unitSelectionController;
         
-        // Last known input position for interaction
-        private Vector3 _lastMousePosition;
+        // Cache for hover pathfinding performance optimization
+        private Vector2Int _lastHoveredGridPos = new Vector2Int(-1, -1); // Invalid position to force first calculation
+        private bool _lastHoverWasValid = false;
+        
+        // Throttling for hover processing - only process hover every few frames
+        private int _hoverFrameSkip = 5; // Process hover every 5 frames
+        private int _currentFrame = 0;
+        
+        // Debug setting
+        private bool _showDetailedDebugLogs = false;
         
         /// <summary>
         /// Constructor
@@ -73,6 +81,8 @@ namespace DarkProtocol.Grid
         public void EnableInput()
         {
             _inputEnabled = true;
+            // Reset hover cache to force recalculation on next hover
+            _lastHoveredGridPos = new Vector2Int(-1, -1);
             Debug.Log("Grid input enabled");
         }
         
@@ -107,10 +117,18 @@ namespace DarkProtocol.Grid
             if (rightMousePressed)
             {
                 HandleRightMouseClick(ray);
+                // Reset hover cache after a click to force recalculation
+                _lastHoveredGridPos = new Vector2Int(-1, -1);
             }
             else if (!leftMousePressed && !Mouse.current.leftButton.isPressed && !Mouse.current.rightButton.isPressed)
             {
-                HandleMouseHover(ray);
+                // Implement frame skipping for hover processing
+                _currentFrame++;
+                if (_currentFrame >= _hoverFrameSkip)
+                {
+                    _currentFrame = 0;
+                    HandleMouseHover(ray);
+                }
             }
         }
         
@@ -128,14 +146,21 @@ namespace DarkProtocol.Grid
                 
             if (Physics.Raycast(ray, out RaycastHit hit))
             {
-                Debug.Log($"Right click detected - hit: {hit.collider.gameObject.name}");
+                if (_showDetailedDebugLogs)
+                    Debug.Log($"Right click detected - hit: {hit.collider.gameObject.name}");
                 
                 // Check if we hit a movement range collider
                 GridPositionMarker marker = hit.collider.GetComponent<GridPositionMarker>();
                 if (marker != null)
                 {
                     Vector2Int gridPos = marker.GridPosition;
-                    Debug.Log($"Clicked on movement tile at grid position: {gridPos}");
+                    
+                    // Check if tile is occupied
+                    if (_gridService.IsTileOccupied(gridPos.x, gridPos.y))
+                    {
+                        Debug.LogWarning($"Cannot move to position {gridPos} - tile is occupied");
+                        return;
+                    }
                     
                     // Move the unit
                     _unitService.MoveUnitToPosition(selectedUnit, gridPos);
@@ -145,6 +170,13 @@ namespace DarkProtocol.Grid
                     // Try to convert hit point to grid position as fallback
                     if (_gridService.WorldToGridPosition(hit.point, out Vector2Int gridPos))
                     {
+                        // Check if tile is occupied
+                        if (_gridService.IsTileOccupied(gridPos.x, gridPos.y))
+                        {
+                            Debug.LogWarning($"Cannot move to position {gridPos} - tile is occupied");
+                            return;
+                        }
+                        
                         // Get the unit's movement range from the visualization service
                         var unitGridPos = Vector2Int.zero;
                         _unitService.GetUnitGridPosition(selectedUnit, out unitGridPos);
@@ -155,24 +187,19 @@ namespace DarkProtocol.Grid
                         // Check if this is a valid movement tile
                         if (movementRange.Contains(gridPos))
                         {
-                            Debug.Log($"Moving unit to grid position: {gridPos}");
+                            if (_showDetailedDebugLogs)
+                                Debug.Log($"Moving unit to grid position: {gridPos}");
+                                
                             // Move the unit
                             _unitService.MoveUnitToPosition(selectedUnit, gridPos);
                         }
                         else
                         {
-                            Debug.Log($"Position {gridPos} is not in movement range");
+                            if (_showDetailedDebugLogs)
+                                Debug.Log($"Position {gridPos} is not in movement range");
                         }
                     }
-                    else
-                    {
-                        Debug.Log("Could not convert hit point to valid grid position");
-                    }
                 }
-            }
-            else
-            {
-                Debug.Log("Right-click raycast did not hit anything");
             }
         }
         
@@ -185,8 +212,13 @@ namespace DarkProtocol.Grid
             // Get the currently selected unit
             Unit selectedUnit = Unit.SelectedUnit;
             
+            // CRITICAL FIX: Only process hovering if there's a selected unit
             if (selectedUnit == null)
+            {
+                // No unit selected, make sure we clear any visualizations
+                _visualizationService.ClearPathVisualization();
                 return;
+            }
             
             bool foundValidPosition = false;
             Vector2Int hoveredGridPos = Vector2Int.zero;
@@ -194,7 +226,14 @@ namespace DarkProtocol.Grid
             // Cast ray
             if (Physics.Raycast(ray, out RaycastHit hit, 100f))
             {
-                Debug.Log($"Mouse hover hit: {hit.collider.gameObject.name} at distance {hit.distance}");
+                // Check if we hit a Unit - we don't want to calculate paths when hovering over units
+                Unit hitUnit = hit.collider.GetComponent<Unit>();
+                if (hitUnit != null)
+                {
+                    // We're hovering over a unit, clear path visualization and skip further processing
+                    _visualizationService.ClearPathVisualization();
+                    return;
+                }
                 
                 // Check if we hit a GridPositionMarker
                 GridPositionMarker marker = hit.collider.GetComponent<GridPositionMarker>();
@@ -202,17 +241,39 @@ namespace DarkProtocol.Grid
                 {
                     hoveredGridPos = marker.GridPosition;
                     foundValidPosition = true;
-                    Debug.Log($"Found grid marker at position {hoveredGridPos}");
+                    
+                    if (_showDetailedDebugLogs)
+                        Debug.Log($"Found grid marker at position {hoveredGridPos}");
                 }
                 else if (_gridService.WorldToGridPosition(hit.point, out hoveredGridPos))
                 {
                     foundValidPosition = true;
-                    Debug.Log($"Converted hit point to grid position {hoveredGridPos}");
+                    
+                    if (_showDetailedDebugLogs)
+                        Debug.Log($"Converted hit point to grid position {hoveredGridPos}");
                 }
             }
             
+            // If nothing changed, don't recalculate
+            if (foundValidPosition == _lastHoverWasValid && hoveredGridPos == _lastHoveredGridPos)
+            {
+                return; // Skip recalculation - nothing changed
+            }
+            
+            // Save current state for next frame comparison
+            _lastHoverWasValid = foundValidPosition;
+            _lastHoveredGridPos = hoveredGridPos;
+            
             if (foundValidPosition)
             {
+                // Check for occupancy here
+                if (_gridService.IsTileOccupied(hoveredGridPos.x, hoveredGridPos.y))
+                {
+                    // If hovering over an occupied tile, clear path
+                    _visualizationService.ClearPathVisualization();
+                    return;
+                }
+                
                 // Get the unit's current position
                 if (_unitService.GetUnitGridPosition(selectedUnit, out Vector2Int unitPos))
                 {
@@ -224,19 +285,19 @@ namespace DarkProtocol.Grid
                         
                         if (path != null && path.Count > 1)
                         {
-                            // CRITICAL: Log to verify we're getting the expected path
-                            Debug.Log($"Found path from {unitPos} to {hoveredGridPos} with {path.Count} points");
-                            
                             // Show the path
                             _visualizationService.VisualizePath(path);
+                            
+                            if (_showDetailedDebugLogs)
+                                Debug.Log($"Found path from {unitPos} to {hoveredGridPos} with {path.Count} points");
                         }
                         else
                         {
-                            // Log the failure reason
-                            Debug.LogWarning($"Could not find path from {unitPos} to {hoveredGridPos}");
-                            
                             // Clear any existing path
                             _visualizationService.ClearPathVisualization();
+                            
+                            if (_showDetailedDebugLogs)
+                                Debug.Log($"Could not find path from {unitPos} to {hoveredGridPos}");
                         }
                     }
                     else
