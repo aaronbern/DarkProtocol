@@ -32,8 +32,8 @@ namespace DarkProtocol.Grid
         // Dictionary for quick lookups of objects on tiles
         private Dictionary<Vector2Int, GameObject> _occupants = new Dictionary<Vector2Int, GameObject>();
         
-        // Cache for pathfinding
-        private Dictionary<Vector2Int, List<Vector2Int>> _pathCache = new Dictionary<Vector2Int, List<Vector2Int>>();
+        // Cache for pathfinding - NEW: This should be using string keys not Vector2Int
+        private Dictionary<string, List<Vector2Int>> _pathStringCache = new Dictionary<string, List<Vector2Int>>();
         
         // Reference to chunk renderers
         private List<GridChunkRenderer> _chunkRenderers = new List<GridChunkRenderer>();
@@ -80,7 +80,7 @@ namespace DarkProtocol.Grid
             
             // Clear collections
             _occupants.Clear();
-            _pathCache.Clear();
+            _pathStringCache.Clear();
             
             Debug.Log($"Grid initialized: {width}x{height} ({width * height} tiles)");
         }
@@ -257,7 +257,7 @@ namespace DarkProtocol.Grid
             UpdateChunkAtPosition(x, z);
             
             // Invalidate path cache since occupancy changed
-            _pathCache.Clear();
+            _pathStringCache.Clear();
         }
         
         /// <summary>
@@ -390,8 +390,11 @@ namespace DarkProtocol.Grid
                 
             // Check cache for identical path request
             string cacheKey = $"{start.x},{start.y}_{end.x},{end.y}_{ignoreOccupied}";
-            if (_pathCache.TryGetValue(start, out List<Vector2Int> cachedPath))
+            
+            // Use string-based cache lookup 
+            if (_pathStringCache.TryGetValue(cacheKey, out List<Vector2Int> cachedPath))
             {
+                Debug.Log($"Using cached path from {start} to {end}");
                 return new List<Vector2Int>(cachedPath); // Return copy to prevent modifications
             }
             
@@ -415,8 +418,9 @@ namespace DarkProtocol.Grid
                 if (current.Equals(end))
                 {
                     List<Vector2Int> path = ReconstructPath(cameFrom, current);
-                    // Cache result
-                    _pathCache[start] = new List<Vector2Int>(path);
+                    // Cache result using the string key
+                    _pathStringCache[cacheKey] = new List<Vector2Int>(path);
+                    Debug.Log($"Found path from {start} to {end} with {path.Count} points");
                     return path;
                 }
                 
@@ -454,6 +458,7 @@ namespace DarkProtocol.Grid
             }
             
             // No path found
+            Debug.LogWarning($"No path found from {start} to {end}");
             return null;
         }
         

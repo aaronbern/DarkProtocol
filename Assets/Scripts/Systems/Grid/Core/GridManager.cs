@@ -1,33 +1,16 @@
 using System.Collections.Generic;
 using UnityEngine;
+using DarkProtocol.Grid.Extensions;
 
 namespace DarkProtocol.Grid
 {
     /// <summary>
-    /// Core manager for the grid system. Handles initialization, interactions, and integration with game systems.
-    /// Uses a data-driven approach with efficient grid overlay visualizations.
+    /// Refactored GridManager that maintains compatibility with existing code
+    /// while using the new service-based architecture.
+    /// Acts as a facade for the new services.
     /// </summary>
     public class GridManager : MonoBehaviour
     {
-        #region Singleton
-        public static GridManager Instance { get; private set; }
-
-        private void Awake()
-        {
-            // Singleton pattern implementation
-            if (Instance != null && Instance != this)
-            {
-                Destroy(gameObject);
-                return;
-            }
-
-            Instance = this;
-            DontDestroyOnLoad(gameObject);
-            
-            Initialize();
-        }
-        #endregion
-
         #region Inspector Fields
         [Header("Grid Data")]
         [SerializeField] public GridData gridData;
@@ -56,201 +39,254 @@ namespace DarkProtocol.Grid
         [SerializeField] private bool showPathfindingResults = true;
         #endregion
 
-        #region Private Variables
-        // Currently selected unit and its state
-        private Unit _selectedUnit;
-        private List<Vector2Int> _currentMovementRange = new List<Vector2Int>();
-        private List<Vector2Int> _currentPath = new List<Vector2Int>();
-        
-        // For editor visualization
-        #if UNITY_EDITOR
-        private bool _hasShownGrid = false;
-        #endif
-        
-        // Last known camera position for LOD
-        private Vector3 _lastCameraPosition;
+        #region Singleton
+        public static GridManager Instance { get; private set; }
+
+        private void Awake()
+        {
+            // Singleton pattern implementation
+            if (Instance != null && Instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+            
+            Initialize();
+        }
         #endregion
 
-        #region Unity Lifecycle
-        private void Start()
-        {
-            // Initialize on Start in case any components need to be available first
-            if (gridData == null && createNewGridOnStart)
-            {
-                CreateNewGrid();
-            }
-            
-            // Initialize grid visualization
-            if (gridData != null)
-            {
-                // Create chunk renderers if needed
-                if (gridParent == null)
-                {
-                    gridParent = new GameObject("Grid").transform;
-                    gridParent.SetParent(transform);
-                }
-                
-                gridData.GenerateChunkRenderers(gridParent);
-                
-                // Register for unit selection events from other systems
-                UnitSelectionController unitSelectionController = FindFirstObjectByType<UnitSelectionController>();
-
-                if (unitSelectionController != null)
-                {
-                    // Use reflection to add our method to their event if it exists
-                    var eventField = unitSelectionController.GetType().GetField("OnUnitSelected", 
-                        System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                    
-                    if (eventField != null)
-                    {
-                        UnityEngine.Events.UnityEvent<Unit> onUnitSelected = 
-                            (UnityEngine.Events.UnityEvent<Unit>)eventField.GetValue(unitSelectionController);
-                        
-                        if (onUnitSelected != null)
-                        {
-                            onUnitSelected.AddListener(OnUnitSelected);
-                        }
-                    }
-                }
-            }
-            
-            // Find main camera if not set
-            if (mainCamera == null)
-            {
-                mainCamera = Camera.main;
-            }
-            
-            // Store initial camera position
-            if (mainCamera != null)
-            {
-                _lastCameraPosition = mainCamera.transform.position;
-            }
-            
-            // Set up grid overlay system
-            SetupGridOverlaySystem();
-        }
+        #region Services
+        // Services (private, only accessible through interface methods)
+        private IGridService _gridService;
+        private IPathfindingService _pathfindingService;
+        private IUnitGridService _unitGridService;
+        private IGridVisualizationService _visualizationService;
+        private IGridInputService _inputService;
+        private IGridSerializationService _serializationService;
+        private IGridExtensionService _extensionService;
         
-        private void Update()
-        {
-            if (gridData == null) return;
-            
-            // Update camera position for chunk visibility
-            if (mainCamera != null)
-            {
-                Vector3 cameraPosition = mainCamera.transform.position;
-                
-                // Only update if the camera has moved significantly
-                if (Vector3.Distance(cameraPosition, _lastCameraPosition) > 1.0f)
-                {
-                    gridData.UpdateChunkVisibility(cameraPosition);
-                    _lastCameraPosition = cameraPosition;
-                }
-            }
-            
-            // Handle unit movement input if a unit is selected
-            if (_selectedUnit != null && _currentMovementRange.Count > 0)
-            {
-                HandleUnitMovementInput();
-            }
-        }
-        
-        // Draw grid lines in the editor
-        #if UNITY_EDITOR
-        private void OnDrawGizmos()
-        {
-            if (gridData == null || !showGridInEditor) return;
-                
-            if (!Application.isPlaying || !_hasShownGrid)
-            {
-                DrawGridGizmos();
-                _hasShownGrid = true;
-            }
-        }
-        #endif
+        // MonoBehaviour for processing input
+        private GridInputProcessor _inputProcessor;
         #endregion
 
         #region Initialization
         /// <summary>
-        /// Initialize the grid system
+        /// Initialize the grid manager
         /// </summary>
         private void Initialize()
         {
+            Debug.Log("Initializing GridManager with new service-based architecture");
+            
+            // Create services
+            CreateServices();
+            
+            // Initialize grid
+            if (gridData == null && createNewGridOnStart)
+            {
+                CreateNewGrid();
+            }
+            else if (gridData != null)
+            {
+                // Update Grid service with the grid data
+                ((GridService)_gridService).GridData = gridData;
+                _gridService.Initialize();
+            }
+            
+            // Create input processor
+            _inputProcessor = gameObject.AddComponent<GridInputProcessor>();
+            _inputProcessor.Initialize(_inputService);
+            
+            // Initialize grid visualization
+            if (gridParent == null)
+            {
+                gridParent = new GameObject("Grid").transform;
+                gridParent.SetParent(transform);
+            }
+            
+            // Generate chunk renderers
             if (gridData != null)
             {
-                // Initialize the grid data
-                gridData.Initialize();
+                gridData.GenerateChunkRenderers(gridParent);
                 
-                Debug.Log($"Grid Manager initialized with grid: {gridData.Width}x{gridData.Height}");
-            }
-        }
-        
-        /// <summary>
-        /// Set up the grid overlay system
-        /// </summary>
-        private void SetupGridOverlaySystem()
-        {
-            // Get reference to GridOverlaySystem if not already set
-            if (gridOverlaySystem == null)
-            {
-                gridOverlaySystem = GetComponent<GridOverlaySystem>();
-                
-                if (gridOverlaySystem == null)
+                // Find main camera if not set
+                if (mainCamera == null)
                 {
-                    gridOverlaySystem = FindFirstObjectByType<GridOverlaySystem>();
-                    
-                    if (gridOverlaySystem == null && Application.isPlaying)
-                    {
-                        // Create the overlay system component if it doesn't exist
-                        Debug.Log("Creating GridOverlaySystem component");
-                        gridOverlaySystem = gameObject.AddComponent<GridOverlaySystem>();
-                    }
+                    mainCamera = Camera.main;
                 }
             }
             
-            // Set colors on the grid overlay system
-            if (gridOverlaySystem != null)
+            // Register for turn changed events from GameManager
+            if (GameManager.Instance != null)
             {
-                gridOverlaySystem.SetMovementRangeColor(movementRangeColor);
-                gridOverlaySystem.SetPathPreviewColor(pathPreviewColor);
+                GameManager.Instance.OnTurnChanged += HandleTurnChanged;
+            }
+            
+            Debug.Log("GridManager initialization complete");
+        }
+        
+        /// <summary>
+        /// Create and register all grid services
+        /// </summary>
+        private void CreateServices()
+        {
+            // Create the service locator instance
+            var serviceLocator = GridServiceLocator.Instance;
+            
+            // Create and register the grid service
+            _gridService = new GridService(gridData);
+            serviceLocator.RegisterService<IGridService>(_gridService);
+            
+            // Set default grid settings
+            GridService gridServiceImpl = _gridService as GridService;
+            if (gridServiceImpl != null)
+            {
+                gridServiceImpl.DefaultWidth = defaultWidth;
+                gridServiceImpl.DefaultHeight = defaultHeight;
+                gridServiceImpl.DefaultCellSize = defaultCellSize;
+            }
+            
+            // Create and register the pathfinding service
+            _pathfindingService = new PathfindingService(_gridService);
+            serviceLocator.RegisterService<IPathfindingService>(_pathfindingService);
+            
+            // Create and register the visualization service
+            _visualizationService = new GridVisualizationService(_gridService, _pathfindingService, gridOverlaySystem);
+            serviceLocator.RegisterService<IGridVisualizationService>(_visualizationService);
+            
+            // Configure visualization colors
+            ((GridVisualizationService)_visualizationService).SetMovementRangeColor(movementRangeColor);
+            ((GridVisualizationService)_visualizationService).SetPathPreviewColor(pathPreviewColor);
+            
+            // Create and register the unit grid service
+            _unitGridService = new UnitGridService(_gridService, _pathfindingService, _visualizationService);
+            serviceLocator.RegisterService<IUnitGridService>(_unitGridService);
+            
+            // Create and register the input service
+            _inputService = new GridInputService(_gridService, _unitGridService, _pathfindingService, _visualizationService);
+            serviceLocator.RegisterService<IGridInputService>(_inputService);
+            
+            // Create and register the serialization service
+            _serializationService = new GridSerializationService(_gridService);
+            serviceLocator.RegisterService<IGridSerializationService>(_serializationService);
+            
+            // Create and register the extension service
+            _extensionService = new GridExtensionService(_gridService);
+            serviceLocator.RegisterService<IGridExtensionService>(_extensionService);
+            
+            Debug.Log("Grid services created and registered");
+        }
+        
+        /// <summary>
+        /// Handle turn state changes from the GameManager
+        /// </summary>
+        private void HandleTurnChanged(GameManager.TurnState newState)
+        {
+            if (newState == GameManager.TurnState.PlayerTurn)
+            {
+                // Enable input during player turn
+                _inputService.EnableInput();
             }
             else
             {
-                Debug.LogWarning("GridOverlaySystem not available. Movement range visualization will not work!");
+                // Disable input during enemy turn or transitions
+                _inputService.DisableInput();
+                
+                // Clear visualizations
+                _visualizationService.ClearMovementRange();
+                _visualizationService.ClearPathVisualization();
+            }
+        }
+        #endregion
+        
+        #region Unity Lifecycle
+        private void Update()
+        {
+            if (mainCamera != null && gridData != null)
+            {
+                // Update chunk visibility based on camera position
+                Vector3 cameraPosition = mainCamera.transform.position;
+                gridData.UpdateChunkVisibility(cameraPosition);
             }
         }
         
+        private void OnDestroy()
+        {
+            // Unsubscribe from GameManager events
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.OnTurnChanged -= HandleTurnChanged;
+            }
+            
+            // Clean up services if needed
+            var serviceLocator = GridServiceLocator.Instance;
+            if (serviceLocator != null)
+            {
+                serviceLocator.ClearServices();
+            }
+        }
+        #endregion
+
+        #if UNITY_EDITOR
+        private void OnDrawGizmos()
+        {
+            // Only draw if showGridInEditor is enabled
+            if (!showGridInEditor || gridData == null) 
+                return;
+            
+            // Set up the gizmo color and matrix
+            Gizmos.color = gridLineColor;
+            
+            // Get grid dimensions
+            int width = gridData.Width;
+            int height = gridData.Height;
+            float cellSize = gridData.CellSize;
+            Vector3 origin = gridData.MapOrigin;
+            
+            // Draw horizontal lines (along Z axis)
+            for (int z = 0; z <= height; z++)
+            {
+                Vector3 start = origin + new Vector3(0, 0, z * cellSize);
+                Vector3 end = origin + new Vector3(width * cellSize, 0, z * cellSize);
+                Gizmos.DrawLine(start, end);
+            }
+            
+            // Draw vertical lines (along X axis)
+            for (int x = 0; x <= width; x++)
+            {
+                Vector3 start = origin + new Vector3(x * cellSize, 0, 0);
+                Vector3 end = origin + new Vector3(x * cellSize, 0, height * cellSize);
+                Gizmos.DrawLine(start, end);
+            }
+        }
+        #endif
+        #region Public Methods (Compatibility API)
         /// <summary>
         /// Create a new grid with default settings
         /// </summary>
         public void CreateNewGrid()
         {
-            // Create a new grid data asset
-            gridData = ScriptableObject.CreateInstance<GridData>();
-            
-            // Set default properties
-            // Normally these would come from a saved asset or settings menu
-            #if UNITY_EDITOR
-            // Create a proper asset in the editor
-            string path = "Assets/Resources/GridData/DefaultGrid.asset";
-            UnityEditor.AssetDatabase.CreateAsset(gridData, path);
-            UnityEditor.AssetDatabase.SaveAssets();
-            Debug.Log($"Created new grid asset at {path}");
-            #endif
-            
-            // Initialize with default values
-            gridData.Initialize();
-            
-            Debug.Log($"Created new grid: {gridData.Width}x{gridData.Height}");
-        }
-        #endregion
+            if (_gridService != null)
+            {
+                ((GridService)_gridService).CreateNewGrid();
+                gridData = ((GridService)_gridService).GridData;
 
-        #region Public Interface Methods
+                // Generate chunk renderers
+                if (gridData != null)
+                {
+                    gridData.GenerateChunkRenderers(gridParent);
+                }
+            }
+        }
+        
         /// <summary>
         /// Check if a position is valid on the grid
         /// </summary>
         public bool IsValidPosition(int x, int z)
         {
-            return gridData != null && gridData.IsValidPosition(x, z);
+            return _gridService != null && _gridService.IsValidPosition(x, z);
         }
         
         /// <summary>
@@ -274,7 +310,7 @@ namespace DarkProtocol.Grid
         /// </summary>
         public Vector3 GridToWorldPosition(int x, int z)
         {
-            return gridData?.GridToWorldPosition(x, z) ?? Vector3.zero;
+            return _gridService?.GridToWorldPosition(x, z) ?? Vector3.zero;
         }
         
         /// <summary>
@@ -282,7 +318,7 @@ namespace DarkProtocol.Grid
         /// </summary>
         public Vector3 GridToWorldPosition(Vector2Int gridPosition)
         {
-            return gridData?.GridToWorldPosition(gridPosition) ?? Vector3.zero;
+            return _gridService?.GridToWorldPosition(gridPosition) ?? Vector3.zero;
         }
         
         /// <summary>
@@ -290,9 +326,9 @@ namespace DarkProtocol.Grid
         /// </summary>
         public bool WorldToGridPosition(Vector3 worldPosition, out int x, out int z)
         {
-            if (gridData != null)
+            if (_gridService != null)
             {
-                return gridData.WorldToGridPosition(worldPosition, out x, out z);
+                return _gridService.WorldToGridPosition(worldPosition, out x, out z);
             }
             
             x = 0;
@@ -305,9 +341,9 @@ namespace DarkProtocol.Grid
         /// </summary>
         public bool WorldToGridPosition(Vector3 worldPosition, out Vector2Int gridPosition)
         {
-            if (gridData != null)
+            if (_gridService != null)
             {
-                return gridData.WorldToGridPosition(worldPosition, out gridPosition);
+                return _gridService.WorldToGridPosition(worldPosition, out gridPosition);
             }
             
             gridPosition = Vector2Int.zero;
@@ -319,87 +355,7 @@ namespace DarkProtocol.Grid
         /// </summary>
         public TerrainType GetTerrainType(int x, int z)
         {
-            return gridData?.GetTileData(x, z)?.TerrainType ?? TerrainType.Ground;
-        }
-        
-        /// <summary>
-        /// Centers the grid on the world origin
-        /// </summary>
-        public void CenterGridOnOrigin()
-        {
-            if (gridData == null)
-            {
-                Debug.LogWarning("Cannot center grid: GridData is null");
-                return;
-            }
-            
-            // Calculate what the offset should be to center the grid
-            float width = gridData.Width * gridData.CellSize;
-            float height = gridData.Height * gridData.CellSize;
-            
-            // Center the grid by setting the origin to negative half of dimensions
-            Vector3 centeredOrigin = new Vector3(-width/2f, 0, -height/2f);
-            
-            // Update the origin in the grid data
-            var originField = gridData.GetType().GetField("mapOrigin", 
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
-                
-            if (originField != null)
-            {
-                originField.SetValue(gridData, centeredOrigin);
-                Debug.Log($"Centered grid origin at {centeredOrigin}");
-            }
-            else
-            {
-                Debug.LogWarning("Could not find mapOrigin field in GridData");
-            }
-            
-            // If grid is already created, you'll need to regenerate it
-            if (gridData.Width > 0 && gridData.Height > 0)
-            {
-                // Regenerate the grid with the new origin
-                gridData.GenerateChunkRenderers(transform);
-            }
-        }
-
-        /// <summary>
-        /// Creates a new grid using default settings from the inspector
-        /// </summary>
-        public void CreateGridWithDefaultSettings()
-        {
-            // Get the default values from your inspector fields
-            int defaultWidth = this.defaultWidth;
-            int defaultHeight = this.defaultHeight;
-            float defaultCellSize = this.defaultCellSize;
-            
-            // Create a new grid data instance if needed
-            if (gridData == null)
-            {
-                gridData = ScriptableObject.CreateInstance<GridData>();
-            }
-            
-            // Set the properties explicitly
-            var widthField = gridData.GetType().GetField("width", 
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
-            var heightField = gridData.GetType().GetField("height", 
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
-            var cellSizeField = gridData.GetType().GetField("cellSize", 
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
-                
-            if (widthField != null) widthField.SetValue(gridData, defaultWidth);
-            if (heightField != null) heightField.SetValue(gridData, defaultHeight);
-            if (cellSizeField != null) cellSizeField.SetValue(gridData, defaultCellSize);
-            
-            // Center the grid on the origin
-            CenterGridOnOrigin();
-            
-            // Initialize the grid
-            gridData.Initialize();
-            
-            // Generate chunk renderers
-            gridData.GenerateChunkRenderers(transform);
-            
-            Debug.Log($"Created grid with size {defaultWidth}x{defaultHeight}, cell size {defaultCellSize}, centered on origin");
+            return _gridService?.GetTerrainType(x, z) ?? TerrainType.Ground;
         }
         
         /// <summary>
@@ -407,7 +363,7 @@ namespace DarkProtocol.Grid
         /// </summary>
         public void SetTerrainType(int x, int z, TerrainType terrainType, float movementCost = 1f)
         {
-            gridData?.SetTileTerrain(x, z, terrainType, movementCost);
+            _gridService?.SetTerrainType(x, z, terrainType, movementCost);
         }
         
         /// <summary>
@@ -415,7 +371,7 @@ namespace DarkProtocol.Grid
         /// </summary>
         public bool IsTileOccupied(int x, int z)
         {
-            return gridData?.GetTileData(x, z)?.IsOccupied ?? false;
+            return _gridService != null && _gridService.IsTileOccupied(x, z);
         }
         
         /// <summary>
@@ -423,7 +379,7 @@ namespace DarkProtocol.Grid
         /// </summary>
         public void SetTileOccupied(int x, int z, bool occupied, GameObject occupant = null)
         {
-            gridData?.SetTileOccupancy(x, z, occupied, occupant);
+            _gridService?.SetTileOccupied(x, z, occupied, occupant);
         }
         
         /// <summary>
@@ -431,7 +387,7 @@ namespace DarkProtocol.Grid
         /// </summary>
         public List<Vector2Int> FindPath(Vector2Int start, Vector2Int end, bool ignoreOccupied = false)
         {
-            return gridData?.FindPath(start, end, ignoreOccupied);
+            return _pathfindingService?.FindPath(start, end, ignoreOccupied);
         }
         
         /// <summary>
@@ -439,40 +395,7 @@ namespace DarkProtocol.Grid
         /// </summary>
         public List<Vector2Int> ShowMovementRange(Unit unit, int movementPoints)
         {
-            // Clear any existing range visualization
-            ClearMovementRange();
-            
-            if (gridData == null || unit == null)
-                return new List<Vector2Int>();
-                
-            // Get unit position
-            if (!GetUnitGridPosition(unit, out Vector2Int unitPos))
-                return new List<Vector2Int>();
-                
-            // Calculate movement range
-            _currentMovementRange = gridData.CalculateMovementRange(unitPos, movementPoints);
-            
-            // Show visualization using grid overlay system
-            if (gridOverlaySystem != null)
-            {
-                gridOverlaySystem.ShowMovementRange(_currentMovementRange);
-                Debug.Log($"Showing movement range for {unit.UnitName}: {_currentMovementRange.Count} tiles");
-            }
-            else
-            {
-                Debug.LogWarning("GridOverlaySystem not found! Cannot show movement range.");
-                
-                // Try to find or create it
-                SetupGridOverlaySystem();
-                
-                // Try again if we got it
-                if (gridOverlaySystem != null)
-                {
-                    gridOverlaySystem.ShowMovementRange(_currentMovementRange);
-                }
-            }
-            
-            return _currentMovementRange;
+            return _visualizationService?.ShowMovementRange(unit, movementPoints) ?? new List<Vector2Int>();
         }
         
         /// <summary>
@@ -480,13 +403,7 @@ namespace DarkProtocol.Grid
         /// </summary>
         public void ClearMovementRange()
         {
-            _currentMovementRange.Clear();
-            
-            // Clear visualization using grid overlay system
-            if (gridOverlaySystem != null)
-            {
-                gridOverlaySystem.ClearMovementRange();
-            }
+            _visualizationService?.ClearMovementRange();
         }
         
         /// <summary>
@@ -494,34 +411,7 @@ namespace DarkProtocol.Grid
         /// </summary>
         public void VisualizePath(List<Vector2Int> path)
         {
-            // Clear existing path visualization
-            ClearPathVisualization();
-            
-            if (path == null || path.Count < 2 || !showPathfindingResults)
-                return;
-                
-            // Store the current path
-            _currentPath = new List<Vector2Int>(path);
-            
-            // Show visualization using grid overlay system
-            if (gridOverlaySystem != null)
-            {
-                gridOverlaySystem.ShowPathPreview(_currentPath);
-                Debug.Log($"Showing path preview: {_currentPath.Count} tiles");
-            }
-            else
-            {
-                Debug.LogWarning("GridOverlaySystem not found! Cannot show path preview.");
-                
-                // Try to find or create it
-                SetupGridOverlaySystem();
-                
-                // Try again if we got it
-                if (gridOverlaySystem != null)
-                {
-                    gridOverlaySystem.ShowPathPreview(_currentPath);
-                }
-            }
+            _visualizationService?.VisualizePath(path);
         }
         
         /// <summary>
@@ -529,13 +419,7 @@ namespace DarkProtocol.Grid
         /// </summary>
         public void ClearPathVisualization()
         {
-            _currentPath.Clear();
-            
-            // Clear visualization using grid overlay system
-            if (gridOverlaySystem != null)
-            {
-                gridOverlaySystem.ClearPathPreview();
-            }
+            _visualizationService?.ClearPathVisualization();
         }
         
         /// <summary>
@@ -543,59 +427,7 @@ namespace DarkProtocol.Grid
         /// </summary>
         public bool MoveUnitToPosition(Unit unit, Vector2Int targetPos)
         {
-            if (gridData == null || unit == null)
-                return false;
-                
-            // Get current position
-            if (!GetUnitGridPosition(unit, out Vector2Int currentPos))
-                return false;
-                
-            // Check if this is a valid movement
-            bool isValid = _currentMovementRange.Contains(targetPos);
-            
-            if (!isValid)
-            {
-                Debug.LogWarning($"Cannot move unit to position {targetPos} - not in movement range");
-                return false;
-            }
-            
-            // Find path to the target
-            List<Vector2Int> path = gridData.FindPath(currentPos, targetPos);
-            
-            if (path == null || path.Count <= 1)
-            {
-                Debug.LogWarning($"Cannot find path to position {targetPos}");
-                return false;
-            }
-            
-            // Calculate movement cost (sum of tile costs along path)
-            float totalCost = 0;
-            for (int i = 1; i < path.Count; i++) // Start from 1 to skip the starting tile
-            {
-                TileData tileData = gridData.GetTileData(path[i]);
-                totalCost += tileData.MovementCost;
-            }
-            
-            // Check if unit has enough movement points
-            if (unit.CurrentMovementPoints < totalCost)
-            {
-                Debug.LogWarning($"Unit doesn't have enough movement points. Needs {totalCost}, has {unit.CurrentMovementPoints}");
-                return false;
-            }
-            
-            // Update occupancy
-            SetTileOccupied(currentPos.x, currentPos.y, false);
-            SetTileOccupied(targetPos.x, targetPos.y, true, unit.gameObject);
-            
-            // Move the unit visually
-            Vector3 targetWorldPos = GridToWorldPosition(targetPos);
-            unit.Move(targetWorldPos, Mathf.RoundToInt(totalCost));
-            
-            // Clear ranges and paths after movement
-            ClearMovementRange();
-            ClearPathVisualization();
-            
-            return true;
+            return _unitGridService != null && _unitGridService.MoveUnitToPosition(unit, targetPos);
         }
         
         /// <summary>
@@ -603,20 +435,12 @@ namespace DarkProtocol.Grid
         /// </summary>
         public bool GetUnitGridPosition(Unit unit, out Vector2Int position)
         {
-            position = Vector2Int.zero;
-            
-            if (unit == null || gridData == null)
-                return false;
-                
-            // Get unit world position
-            Vector3 worldPos = unit.transform.position;
-            
-            // Convert to grid position
-            if (gridData.WorldToGridPosition(worldPos, out position))
+            if (_unitGridService != null)
             {
-                return true;
+                return _unitGridService.GetUnitGridPosition(unit, out position);
             }
             
+            position = Vector2Int.zero;
             return false;
         }
         
@@ -625,15 +449,7 @@ namespace DarkProtocol.Grid
         /// </summary>
         public void RegisterUnitAtPosition(Unit unit)
         {
-            if (unit == null || gridData == null)
-                return;
-                
-            // Get unit grid position
-            if (GetUnitGridPosition(unit, out Vector2Int pos))
-            {
-                // Set tile as occupied
-                SetTileOccupied(pos.x, pos.y, true, unit.gameObject);
-            }
+            _unitGridService?.RegisterUnitAtPosition(unit);
         }
         
         /// <summary>
@@ -644,188 +460,69 @@ namespace DarkProtocol.Grid
             // This is an example of how to maintain compatibility with the existing system
             return Unit.GetUnitsOfTeam(team);
         }
-        #endregion
-
-        #region Event Handlers
+        
         /// <summary>
         /// Handle unit selection
         /// </summary>
         public void OnUnitSelected(Unit unit)
         {
-            Debug.Log($"Unit selected: {(unit != null ? unit.UnitName : "None")}");
-            
-            // Clear any existing movement range
-            ClearMovementRange();
-            ClearPathVisualization();
-            
-            _selectedUnit = unit;
-            
-            // Show movement range for the selected unit
-            if (unit != null)
-            {
-                ShowMovementRange(unit, unit.CurrentMovementPoints);
-            }
+            _unitGridService?.OnUnitSelected(unit);
         }
         
         /// <summary>
-        /// Handle unit movement input using the new Input System and hybrid interaction system
+        /// Save the grid data to a file
         /// </summary>
-        private void HandleUnitMovementInput()
+        public void SaveToFile(string filePath)
         {
-            if (_selectedUnit == null)
-                return;
-            
-            // Get reference to Mouse from Input System
-            var mouse = UnityEngine.InputSystem.Mouse.current;
-            if (mouse == null)
-                return;
-            
-            // Check for right mouse button click (movement command)
-            if (mouse.rightButton.wasPressedThisFrame)
-            {
-                Debug.Log("Right click detected - attempting movement");
-                
-                // Cast ray from mouse position
-                Vector2 mousePosition = mouse.position.ReadValue();
-                Ray ray = mainCamera.ScreenPointToRay(mousePosition);
-                
-                if (Physics.Raycast(ray, out RaycastHit hit))
-                {
-                    Debug.Log($"Hit object: {hit.collider.gameObject.name}");
-                    
-                    // Check if we hit a movement range collider
-                    GridPositionMarker marker = hit.collider.GetComponent<GridPositionMarker>();
-                    if (marker != null)
-                    {
-                        Vector2Int gridPos = marker.GridPosition;
-                        Debug.Log($"Clicked on movement tile at grid position: {gridPos}");
-                        
-                        // Move the unit
-                        MoveUnitToPosition(_selectedUnit, gridPos);
-                    }
-                    else
-                    {
-                        // Try to convert hit point to grid position as fallback
-                        if (WorldToGridPosition(hit.point, out Vector2Int gridPos))
-                        {
-                            // Check if this is a valid movement tile
-                            if (_currentMovementRange.Contains(gridPos))
-                            {
-                                Debug.Log($"Moving unit to grid position: {gridPos}");
-                                // Move the unit
-                                MoveUnitToPosition(_selectedUnit, gridPos);
-                            }
-                            else
-                            {
-                                Debug.Log($"Position {gridPos} is not in movement range");
-                            }
-                        }
-                        else
-                        {
-                            Debug.Log("Could not convert hit point to valid grid position");
-                        }
-                    }
-                }
-                else
-                {
-                    Debug.Log("Right-click raycast did not hit anything");
-                }
-            }
-            
-            // For hover path preview (only when not pressing any mouse button)
-            if (!mouse.leftButton.isPressed && !mouse.rightButton.isPressed)
-            {
-                Vector2 mousePosition = mouse.position.ReadValue();
-                Ray ray = mainCamera.ScreenPointToRay(mousePosition);
-                
-                if (Physics.Raycast(ray, out RaycastHit hit))
-                {
-                    // Check if we hit a GridPositionMarker
-                    GridPositionMarker marker = hit.collider.GetComponent<GridPositionMarker>();
-                    if (marker != null)
-                    {
-                        Vector2Int markerPosition = marker.GridPosition;
-                        
-                        // Get the unit's current position
-                        if (GetUnitGridPosition(_selectedUnit, out Vector2Int unitPos))
-                        {
-                            // Calculate and show the path
-                            List<Vector2Int> path = gridData.FindPath(unitPos, markerPosition);
-                            if (path != null && path.Count > 0)
-                            {
-                                VisualizePath(path);
-                                return;
-                            }
-                        }
-                    }
-                    
-                    // Fallback to converting hit point to grid position
-                    if (WorldToGridPosition(hit.point, out Vector2Int rayHitPosition))
-                    {
-                        // Check if this is in the movement range
-                        if (_currentMovementRange.Contains(rayHitPosition))
-                        {
-                            // Calculate path
-                            if (GetUnitGridPosition(_selectedUnit, out Vector2Int unitPos))
-                            {
-                                List<Vector2Int> path = gridData.FindPath(unitPos, rayHitPosition);
-                                if (path != null && path.Count > 0)
-                                {
-                                    VisualizePath(path);
-                                }
-                            }
-                        }
-                        else
-                        {
-                            // Not hovering over movement range, clear path visualization
-                            ClearPathVisualization();
-                        }
-                    }
-                }
-                else
-                {
-                    // No hit, clear path visualization
-                    ClearPathVisualization();
-                }
-            }
+            _serializationService?.SaveToFile(filePath);
         }
-        #endregion
-
-        #region Visualization Methods
+        
         /// <summary>
-        /// Draw grid gizmos in the editor
+        /// Load the grid data from a file
         /// </summary>
-        private void DrawGridGizmos()
+        public void LoadFromFile(string filePath)
         {
-            #if UNITY_EDITOR
-            if (gridData == null) return;
-            
-            // Set gizmo color
-            Gizmos.color = gridLineColor;
-            
-            // Get grid properties
-            int width = gridData.Width;
-            int height = gridData.Height;
-            float cellSize = gridData.CellSize;
-            Vector3 origin = gridData.MapOrigin;
-            
-            // Draw horizontal lines
-            for (int z = 0; z <= height; z++)
-            {
-                Vector3 start = origin + new Vector3(0, 0, z * cellSize);
-                Vector3 end = origin + new Vector3(width * cellSize, 0, z * cellSize);
-                Gizmos.DrawLine(start, end);
-            }
-            
-            // Draw vertical lines
-            for (int x = 0; x <= width; x++)
-            {
-                Vector3 start = origin + new Vector3(x * cellSize, 0, 0);
-                Vector3 end = origin + new Vector3(x * cellSize, 0, height * cellSize);
-                Gizmos.DrawLine(start, end);
-            }
-            #endif
+            _serializationService?.LoadFromFile(filePath);
+        }
+        
+        /// <summary>
+        /// Register a grid extension
+        /// </summary>
+        public void RegisterExtension(IGridExtension extension)
+        {
+            _extensionService?.RegisterExtension(extension);
+        }
+        
+        /// <summary>
+        /// Get an extension of a specific type
+        /// </summary>
+        public T GetExtension<T>() where T : class, IGridExtension
+        {
+            return _extensionService?.GetExtension<T>();
         }
         #endregion
+    }
+    
+    /// <summary>
+    /// A simple MonoBehaviour to process input from the grid input service
+    /// </summary>
+    public class GridInputProcessor : MonoBehaviour
+    {
+        private IGridInputService _inputService;
+        
+        /// <summary>
+        /// Initialize the input processor
+        /// </summary>
+        /// <param name="inputService">The input service</param>
+        public void Initialize(IGridInputService inputService)
+        {
+            _inputService = inputService;
+            _inputService.Initialize();
+        }
+        
+        private void Update()
+        {
+            _inputService?.ProcessInput();
+        }
     }
 }
