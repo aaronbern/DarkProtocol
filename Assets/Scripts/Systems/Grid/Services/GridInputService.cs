@@ -30,7 +30,8 @@ namespace DarkProtocol.Grid
         // Throttling for hover processing - only process hover every few frames
         private int _hoverFrameSkip = 5; // Process hover every 5 frames
         private int _currentFrame = 0;
-        
+        private Unit _lastPathUnit = null;
+        private Vector2Int _lastHoveredPosition = new Vector2Int(-1, -1);
         // Debug setting
         private bool _showDetailedDebugLogs = false;
         
@@ -94,44 +95,43 @@ namespace DarkProtocol.Grid
             _inputEnabled = false;
             Debug.Log("Grid input disabled");
         }
-        
+
         /// <summary>
         /// Process input for grid interaction
-        /// Call this from Update() in a MonoBehaviour
         /// </summary>
         public void ProcessInput()
         {
             if (!_inputEnabled || _mainCamera == null)
                 return;
-                
+
+            // Check if it's the player's turn
+            if (GameManager.Instance != null && !GameManager.Instance.IsPlayerTurn())
+            {
+                // Not player's turn, clear any path
+                _visualizationService?.ClearPathVisualization();
+                return;
+            }
+
             // Get current mouse position
             Vector2 mousePosition = Mouse.current.position.ReadValue();
-            
+
             // Cast ray from mouse position
             Ray ray = _mainCamera.ScreenPointToRay(mousePosition);
-            
+
             // Check for mouse button clicks
             bool leftMousePressed = Mouse.current.leftButton.wasPressedThisFrame;
             bool rightMousePressed = Mouse.current.rightButton.wasPressedThisFrame;
-            
+
             if (rightMousePressed)
             {
                 HandleRightMouseClick(ray);
-                // Reset hover cache after a click to force recalculation
-                _lastHoveredGridPos = new Vector2Int(-1, -1);
             }
             else if (!leftMousePressed && !Mouse.current.leftButton.isPressed && !Mouse.current.rightButton.isPressed)
             {
-                // Implement frame skipping for hover processing
-                _currentFrame++;
-                if (_currentFrame >= _hoverFrameSkip)
-                {
-                    _currentFrame = 0;
-                    HandleMouseHover(ray);
-                }
+                HandleMouseHover(ray);
             }
         }
-        
+
         /// <summary>
         /// Handle right mouse click for unit movement
         /// </summary>
@@ -202,115 +202,94 @@ namespace DarkProtocol.Grid
                 }
             }
         }
-        
+
         /// <summary>
         /// Handle mouse hover for path visualization
         /// </summary>
-        /// <param name="ray">Ray from mouse position</param>
         private void HandleMouseHover(Ray ray)
         {
-            // Get the currently selected unit
-            Unit selectedUnit = Unit.SelectedUnit;
-            
-            // CRITICAL FIX: Only process hovering if there's a selected unit
-            if (selectedUnit == null)
+            // Get the currently active unit, not just the selected one
+            Unit activeUnit = GameManager.Instance?.ActiveUnit ?? Unit.SelectedUnit;
+
+            if (activeUnit == null)
             {
-                // No unit selected, make sure we clear any visualizations
+                // No active unit, clear path
                 _visualizationService.ClearPathVisualization();
+                _lastPathUnit = null;
+                _lastHoveredPosition = new Vector2Int(-1, -1);
                 return;
             }
-            
+
+            // Check if the unit has changed
+            if (_lastPathUnit != activeUnit)
+            {
+                // Unit changed, clear path
+                _visualizationService.ClearPathVisualization();
+                _lastPathUnit = activeUnit;
+                _lastHoveredPosition = new Vector2Int(-1, -1);
+            }
+
             bool foundValidPosition = false;
             Vector2Int hoveredGridPos = Vector2Int.zero;
-            
+
             // Cast ray
             if (Physics.Raycast(ray, out RaycastHit hit, 100f))
             {
-                // Check if we hit a Unit - we don't want to calculate paths when hovering over units
-                Unit hitUnit = hit.collider.GetComponent<Unit>();
-                if (hitUnit != null)
-                {
-                    // We're hovering over a unit, clear path visualization and skip further processing
-                    _visualizationService.ClearPathVisualization();
-                    return;
-                }
-                
+                Debug.Log($"Mouse hover hit: {hit.collider.gameObject.name}");
+
                 // Check if we hit a GridPositionMarker
                 GridPositionMarker marker = hit.collider.GetComponent<GridPositionMarker>();
                 if (marker != null)
                 {
                     hoveredGridPos = marker.GridPosition;
                     foundValidPosition = true;
-                    
-                    if (_showDetailedDebugLogs)
-                        Debug.Log($"Found grid marker at position {hoveredGridPos}");
+                    Debug.Log($"Found grid marker at position {hoveredGridPos}");
                 }
                 else if (_gridService.WorldToGridPosition(hit.point, out hoveredGridPos))
                 {
                     foundValidPosition = true;
-                    
-                    if (_showDetailedDebugLogs)
-                        Debug.Log($"Converted hit point to grid position {hoveredGridPos}");
+                    Debug.Log($"Converted hit point to grid position {hoveredGridPos}");
                 }
             }
-            
-            // If nothing changed, don't recalculate
-            if (foundValidPosition == _lastHoverWasValid && hoveredGridPos == _lastHoveredGridPos)
+
+            // Only update path if we have a valid position and it's different from the last one
+            if (foundValidPosition && !hoveredGridPos.Equals(_lastHoveredPosition))
             {
-                return; // Skip recalculation - nothing changed
-            }
-            
-            // Save current state for next frame comparison
-            _lastHoverWasValid = foundValidPosition;
-            _lastHoveredGridPos = hoveredGridPos;
-            
-            if (foundValidPosition)
-            {
-                // Check for occupancy here
-                if (_gridService.IsTileOccupied(hoveredGridPos.x, hoveredGridPos.y))
-                {
-                    // If hovering over an occupied tile, clear path
-                    _visualizationService.ClearPathVisualization();
-                    return;
-                }
-                
+                _lastHoveredPosition = hoveredGridPos;
+
                 // Get the unit's current position
-                if (_unitService.GetUnitGridPosition(selectedUnit, out Vector2Int unitPos))
+                if (_unitService.GetUnitGridPosition(activeUnit, out Vector2Int unitPos))
                 {
-                    // Only try to path if the positions are different
-                    if (unitPos != hoveredGridPos)
+                    // Only proceed if the positions are different
+                    if (!unitPos.Equals(hoveredGridPos))
                     {
-                        // Important: Try with ignoreOccupied = true to get a path
-                        List<Vector2Int> path = _pathfindingService.FindPath(unitPos, hoveredGridPos, true);
-                        
-                        if (path != null && path.Count > 1)
+                        // Get the movement range tiles
+                        var movementRangeTiles = _visualizationService.GetCurrentMovementRange();
+
+                        // Only visualize path if target is in movement range
+                        if (movementRangeTiles.Contains(hoveredGridPos))
                         {
-                            // Show the path
-                            _visualizationService.VisualizePath(path);
-                            
-                            if (_showDetailedDebugLogs)
-                                Debug.Log($"Found path from {unitPos} to {hoveredGridPos} with {path.Count} points");
+                            // Find path using ignoreOccupied = true
+                            List<Vector2Int> path = _pathfindingService.FindPath(unitPos, hoveredGridPos, true);
+
+                            if (path != null && path.Count > 1)
+                            {
+                                // Show the path
+                                _visualizationService.VisualizePath(path);
+                                return;
+                            }
                         }
-                        else
-                        {
-                            // Clear any existing path
-                            _visualizationService.ClearPathVisualization();
-                            
-                            if (_showDetailedDebugLogs)
-                                Debug.Log($"Could not find path from {unitPos} to {hoveredGridPos}");
-                        }
-                    }
-                    else
-                    {
-                        // Clear path if hovering over current position
-                        _visualizationService.ClearPathVisualization();
                     }
                 }
-            }
-            else
-            {
-                // No hit, clear path
+
+                // If we got here, clear the path visualization
                 _visualizationService.ClearPathVisualization();
+            }
+            else if (!foundValidPosition)
+            {
+                // No valid position, clear path
+                _visualizationService.ClearPathVisualization();
+                _lastHoveredPosition = new Vector2Int(-1, -1);
             }
         }
     }

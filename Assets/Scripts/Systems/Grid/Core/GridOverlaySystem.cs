@@ -149,6 +149,16 @@ public class GridOverlaySystem : MonoBehaviour
         }
     }
 
+
+    /// <summary>
+    /// Get the current movement range
+    /// </summary>
+    /// <returns>List of positions in the current movement range</returns>
+    public List<Vector2Int> GetCurrentMovementRange()
+    {
+        return new List<Vector2Int>(_currentMovementRangePositions);
+    }
+    
     private void OnDestroy()
     {
         // Clean up created materials
@@ -159,7 +169,7 @@ public class GridOverlaySystem : MonoBehaviour
             else
                 DestroyImmediate(_movementRangeMaterialInstance);
         }
-        
+
         if (_pathPreviewMaterialInstance != null && _pathPreviewMaterialInstance != pathPreviewMaterial)
         {
             if (Application.isPlaying)
@@ -167,7 +177,7 @@ public class GridOverlaySystem : MonoBehaviour
             else
                 DestroyImmediate(_pathPreviewMaterialInstance);
         }
-        
+
         // Clean up created mesh
         if (_overlayMesh != null)
         {
@@ -176,10 +186,10 @@ public class GridOverlaySystem : MonoBehaviour
             else
                 DestroyImmediate(_overlayMesh);
         }
-        
+
         // Clean up colliders
         CleanupInteractionColliders();
-        
+
         // Clean up parent
         if (_collidersParent != null)
         {

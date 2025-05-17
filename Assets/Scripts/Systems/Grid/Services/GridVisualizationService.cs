@@ -162,7 +162,19 @@ namespace DarkProtocol.Grid
                 }
             }
         }
-        
+        /// <summary>
+        /// Get the current movement range
+        /// </summary>
+        /// <returns>List of positions in the current movement range</returns>
+        public List<Vector2Int> GetCurrentMovementRange()
+        {
+            if (_gridOverlaySystem != null)
+            {
+                return _gridOverlaySystem.GetCurrentMovementRange();
+            }
+
+            return new List<Vector2Int>();
+        }
         /// <summary>
         /// Clear the path visualization
         /// </summary>

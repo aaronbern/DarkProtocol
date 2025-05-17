@@ -427,53 +427,72 @@ public class UnitSelectionController : MonoBehaviour
         int nextIndex = (currentIndex + 1) % _availableUnits.Count;
         SelectUnit(_availableUnits[nextIndex]);
     }
-    
+
     /// <summary>
-    /// Handles mouse clicks for unit selection (only enabled during selection phase)
+    /// Handles unit clicks for selection (only enabled during selection phase)
     /// </summary>
     public void HandleUnitClicked(Unit clickedUnit)
     {
         if (showDebugInfo)
-            Debug.Log($"HandleUnitClicked called for {clickedUnit?.UnitName ?? "null"}. Selection enabled: {_selectionEnabled}");
-        
-        // Only process clicks when selection is enabled
-        if (!_selectionEnabled) 
+            Debug.Log($"HandleUnitClicked called for {clickedUnit?.UnitName ?? "null"}");
+
+        // Only allow selecting the active unit during a turn
+        if (GameManager.Instance != null && GameManager.Instance.IsPlayerTurn())
         {
-            if (showDebugInfo)
-                Debug.Log("Selection is disabled - unit is currently active or it's not player turn");
-            return;
+            Unit activeUnit = GameManager.Instance.ActiveUnit;
+
+            // If there's an active unit and it's not the one clicked
+            if (activeUnit != null && clickedUnit != activeUnit)
+            {
+                Debug.LogWarning($"Cannot select {clickedUnit?.UnitName} - must finish {activeUnit.UnitName}'s turn first");
+
+                // Here you could show a UI message
+                // UIManager.Instance.ShowMessage($"Must finish {activeUnit.UnitName}'s turn first");
+
+                return;
+            }
         }
-        
-        // Verify the unit is valid and available
-        if (clickedUnit != null && clickedUnit.Team == Unit.TeamType.Player && 
-            clickedUnit.IsAlive && !_unitsActedThisRound.Contains(clickedUnit))
+
+        // Continue with normal selection logic if the clicked unit is the active one
+        // or if we're in the unit selection phase
+        if (_selectionEnabled)
         {
-            if (showDebugInfo)
-                Debug.Log($"Unit {clickedUnit.UnitName} is valid for selection");
-                
-            SelectUnit(clickedUnit);
+            // Verify the unit is valid and available
+            if (clickedUnit != null && clickedUnit.Team == Unit.TeamType.Player &&
+                clickedUnit.IsAlive && !_unitsActedThisRound.Contains(clickedUnit))
+            {
+                if (showDebugInfo)
+                    Debug.Log($"Unit {clickedUnit.UnitName} is valid for selection");
+
+                SelectUnit(clickedUnit);
+            }
+            else
+            {
+                // Debug why the unit can't be selected
+                if (clickedUnit == null)
+                {
+                    Debug.Log("Clicked unit is null");
+                }
+                else if (clickedUnit.Team != Unit.TeamType.Player)
+                {
+                    Debug.Log($"Unit {clickedUnit.UnitName} is not on Player team");
+                }
+                else if (!clickedUnit.IsAlive)
+                {
+                    Debug.Log($"Unit {clickedUnit.UnitName} is not alive");
+                }
+                else if (_unitsActedThisRound.Contains(clickedUnit))
+                {
+                    Debug.Log($"Unit {clickedUnit.UnitName} has already acted this round");
+                }
+            }
         }
         else
         {
-            if (clickedUnit == null)
-            {
-                Debug.Log("Clicked unit is null");
-            }
-            else if (clickedUnit.Team != Unit.TeamType.Player)
-            {
-                Debug.Log($"Unit {clickedUnit.UnitName} is not on Player team");
-            }
-            else if (!clickedUnit.IsAlive)
-            {
-                Debug.Log($"Unit {clickedUnit.UnitName} is not alive");
-            }
-            else if (_unitsActedThisRound.Contains(clickedUnit))
-            {
-                Debug.Log($"Unit {clickedUnit.UnitName} has already acted this round");
-            }
+            Debug.Log("Selection is disabled - unit is currently active or it's not player turn");
         }
     }
-    
+
     /// <summary>
     /// Mark a unit as ready to act again (useful for abilities that grant extra actions)
     /// </summary>

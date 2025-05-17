@@ -143,7 +143,7 @@ namespace DarkProtocol.Grid
         /// </summary>
         /// <param name="unit">The unit to register</param>
         void RegisterUnitAtPosition(Unit unit);
-        
+
         /// <summary>
         /// Get the grid position of a unit
         /// </summary>
@@ -151,7 +151,7 @@ namespace DarkProtocol.Grid
         /// <param name="position">Output grid position</param>
         /// <returns>True if the position was found</returns>
         bool GetUnitGridPosition(Unit unit, out Vector2Int position);
-        
+
         /// <summary>
         /// Move a unit to a grid position
         /// </summary>
@@ -159,12 +159,18 @@ namespace DarkProtocol.Grid
         /// <param name="targetPos">Target grid position</param>
         /// <returns>True if movement was successful</returns>
         bool MoveUnitToPosition(Unit unit, Vector2Int targetPos);
-        
+
         /// <summary>
         /// Handle unit selection
         /// </summary>
         /// <param name="unit">The selected unit</param>
         void OnUnitSelected(Unit unit);
+
+        /// <summary>
+        /// Get the current movement range for the selected unit
+        /// </summary>
+        /// <returns>List of positions in the movement range</returns>
+        List<Vector2Int> GetCurrentMovementRange();
     }
 
     /// <summary>
@@ -179,22 +185,28 @@ namespace DarkProtocol.Grid
         /// <param name="movementPoints">Available movement points</param>
         /// <returns>List of positions in the movement range</returns>
         List<Vector2Int> ShowMovementRange(Unit unit, int movementPoints);
-        
+
         /// <summary>
         /// Clear the movement range visualization
         /// </summary>
         void ClearMovementRange();
-        
+
         /// <summary>
         /// Visualize a path between points
         /// </summary>
         /// <param name="path">List of positions forming the path</param>
         void VisualizePath(List<Vector2Int> path);
-        
+
         /// <summary>
         /// Clear the path visualization
         /// </summary>
         void ClearPathVisualization();
+
+        /// <summary>
+        /// Get the current movement range
+        /// </summary>
+        /// <returns>List of positions in the current movement range</returns>
+        List<Vector2Int> GetCurrentMovementRange();
     }
 
     /// <summary>

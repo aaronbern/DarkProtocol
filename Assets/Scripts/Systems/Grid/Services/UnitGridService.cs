@@ -183,34 +183,50 @@ namespace DarkProtocol.Grid
             
             return moveResult;
         }
-        
+
         /// <summary>
         /// Handle unit selection
         /// </summary>
         /// <param name="unit">The selected unit</param>
         public void OnUnitSelected(Unit unit)
         {
-            Debug.Log($"Unit selected: {(unit != null ? GetUnitDisplayName(unit) : "None")}");
-            
-            // Clear any existing movement range
+            // Clear any existing visualizations first
             if (_visualizationService != null)
             {
                 _visualizationService.ClearMovementRange();
                 _visualizationService.ClearPathVisualization();
             }
-            
+
             _currentMovementRange.Clear();
             _selectedUnit = unit;
-            
-            // Show movement range for the selected unit
-            if (unit != null && _visualizationService != null)
+
+            // Check if this is the active unit in the current turn
+            bool isActiveUnit = false;
+            if (GameManager.Instance != null)
             {
-                Debug.Log($"Selected unit {GetUnitDisplayName(unit)} has {unit.CurrentMovementPoints} movement points");
+                isActiveUnit = (GameManager.Instance.ActiveUnit == unit);
+            }
+
+            // Only show movement range for the active unit
+            if (unit != null && isActiveUnit && _visualizationService != null)
+            {
+                Debug.Log($"Showing movement range for active unit {GetUnitDisplayName(unit)}");
                 _currentMovementRange = _visualizationService.ShowMovementRange(unit, unit.CurrentMovementPoints);
-                Debug.Log($"Movement range contains {_currentMovementRange.Count} tiles");
+            }
+            else if (unit != null && !isActiveUnit)
+            {
+                // This unit is not the active unit - display a message
+                Debug.LogWarning($"Cannot show movement for {GetUnitDisplayName(unit)} - not the active unit");
+
+                // Here you could trigger a UI message saying "Must finish current unit's turn first"
+                // For example:
+                // UIManager.Instance.ShowMessage("Must finish current unit's turn first");
             }
         }
-        
+        public List<Vector2Int> GetCurrentMovementRange()
+        {
+            return new List<Vector2Int>(_currentMovementRange);
+        }
         /// <summary>
         /// Get a display name for the unit, safely handling if UnitName doesn't exist
         /// </summary>
