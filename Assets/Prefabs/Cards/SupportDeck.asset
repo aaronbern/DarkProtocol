@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9dd525e469bb6d04e916433b277fc281, type: 3}
+  m_Name: SupportDeck
+  m_EditorClassIdentifier: 
+  deckName: Support Operative
+  deckDescription: Focused on healing and buffing allies.
+  specializedCards:
+  - {fileID: 11400000, guid: 93f0dbf3b8e85c04a9b4a80c589e6d63, type: 2}
+  - {fileID: 11400000, guid: 231b1a25f50c09147b2f664fd3a64067, type: 2}
+  commonCardCopies: 2
+  maxSpecializedCards: 5
+  minActionPointCost: 0
+  maxActionPointCost: 3
+  averageActionPointCost: 0

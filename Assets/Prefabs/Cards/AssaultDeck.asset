@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9dd525e469bb6d04e916433b277fc281, type: 3}
+  m_Name: AssaultDeck
+  m_EditorClassIdentifier: 
+  deckName: Assault Operative
+  deckDescription: Focused on direct damage and offensive capabilities.
+  specializedCards:
+  - {fileID: 11400000, guid: 0639bb581708cbd45b4f6eb6552b21a2, type: 2}
+  - {fileID: 11400000, guid: f5f51f75663393d45b025e82956ea232, type: 2}
+  - {fileID: 11400000, guid: 78bfe96d3e776ff4b851bd7df11ca23e, type: 2}
+  - {fileID: 11400000, guid: f0643f251889fe64392660125b0f5118, type: 2}
+  commonCardCopies: 2
+  maxSpecializedCards: 5
+  minActionPointCost: 0
+  maxActionPointCost: 3
+  averageActionPointCost: 0
