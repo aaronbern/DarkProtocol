@@ -3,11 +3,12 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.InputSystem;
+using DarkProtocol.Cards;
+using DarkProtocol.Grid;
 
 /// <summary>
 /// Controls unit selection for Dark Protocol's turn-based system.
 /// Manages which unit is selected for the current player round.
-/// Uses the new Input System.
 /// </summary>
 public class UnitSelectionController : MonoBehaviour
 {
@@ -24,7 +25,7 @@ public class UnitSelectionController : MonoBehaviour
         {
             if (_instance == null)
             {
-                _instance = Object.FindAnyObjectByType<UnitSelectionController>();
+                _instance = FindFirstObjectByType<UnitSelectionController>();
                 
                 if (_instance == null)
                 {
@@ -93,6 +94,9 @@ public class UnitSelectionController : MonoBehaviour
     private List<Unit> _unitsActedThisRound = new List<Unit>();
     private InputAction _tabAction;
     
+    // Reference to the Card System
+    private CardSystem _cardSystem;
+    
     // Read-only property for the currently selected unit
     public Unit CurrentlySelectedUnit => Unit.SelectedUnit;
     
@@ -129,6 +133,14 @@ public class UnitSelectionController : MonoBehaviour
             Debug.LogError("No main camera found! UnitSelectionController requires a camera tagged as 'MainCamera'.");
         }
         
+        // Get Card System reference
+                    _cardSystem = FindFirstObjectByType<CardSystem>();
+        
+        if (_cardSystem == null)
+        {
+            Debug.LogWarning("CardSystem not found! Card functionality will be limited.");
+        }
+        
         // Subscribe to game manager events
         if (GameManager.Instance != null)
         {
@@ -154,9 +166,11 @@ public class UnitSelectionController : MonoBehaviour
     /// </summary>
     private void OnTabKeyPressed(InputAction.CallbackContext context)
     {
-        if (showDebugInfo && _selectionEnabled)
+        if (_selectionEnabled)
         {
-            Debug.Log("Tab key pressed, cycling to next unit");
+            if (showDebugInfo)
+                Debug.Log("Tab key pressed, cycling to next unit");
+                
             CycleToNextAvailableUnit();
         }
     }
@@ -178,8 +192,20 @@ public class UnitSelectionController : MonoBehaviour
         else
         {
             // Any other turn state (enemy turn or transitioning)
-            // Make sure selection is disabled
+            // Make sure selection is disabled and cleanup any active unit
             _selectionEnabled = false;
+            
+            // Clear any card hand if a unit is selected
+            if (CurrentlySelectedUnit != null && _cardSystem != null)
+            {
+                _cardSystem.DiscardHand(CurrentlySelectedUnit);
+                
+                // Deselect the unit
+                Unit.SelectUnit(null);
+            }
+            
+            // Clear the list of units that acted this round
+            _unitsActedThisRound.Clear();
         }
     }
     
@@ -199,8 +225,17 @@ public class UnitSelectionController : MonoBehaviour
         
         if (_availableUnits.Count == 0)
         {
-            Debug.LogWarning("No available units to select!");
+            if (showDebugInfo)
+                Debug.LogWarning("No available units to select!");
+                
             OnNoUnitsAvailable?.Invoke();
+            
+            // Since no units are available, suggest ending the turn
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.EndPlayerTurn();
+            }
+            
             return;
         }
         
@@ -212,10 +247,8 @@ public class UnitSelectionController : MonoBehaviour
         else
         {
             // Show UI or wait for input to select a unit
-            Debug.Log($"Please select a unit. {_availableUnits.Count} units available.");
-            
-            // If UI is implemented, we would activate it here
-            // For now, we'll rely on the player clicking units
+            if (showDebugInfo)
+                Debug.Log($"Please select a unit. {_availableUnits.Count} units available.");
         }
     }
     
@@ -226,16 +259,32 @@ public class UnitSelectionController : MonoBehaviour
     {
         if (unit != null)
         {
+            if (showDebugInfo)
+                Debug.Log($"Unit {unit.UnitName} finished turn");
+                
             // Add to the list of units that have acted this round
             if (!_unitsActedThisRound.Contains(unit))
             {
                 _unitsActedThisRound.Add(unit);
             }
             
-            // Deselect the unit
-            if (Unit.SelectedUnit == unit)
+            // Clear any card hand for this unit
+            if (_cardSystem != null)
+            {
+                _cardSystem.DiscardHand(unit);
+            }
+            
+            // Deselect the unit if it's the currently selected one
+            if (CurrentlySelectedUnit == unit)
             {
                 Unit.SelectUnit(null);
+                
+                // Notify the grid about unit deselection
+                if (GridManager.Instance != null)
+                {
+                    // Passing null to clear selection state
+                    GridManager.Instance.OnUnitSelected(null);
+                }
             }
         }
         
@@ -255,15 +304,21 @@ public class UnitSelectionController : MonoBehaviour
             else
             {
                 // Show UI or wait for input to select another unit
-                Debug.Log($"Please select another unit. {_availableUnits.Count} units remaining.");
+                if (showDebugInfo)
+                    Debug.Log($"Please select another unit. {_availableUnits.Count} units remaining.");
             }
         }
         else
         {
             // No more units can act this round, suggest ending the turn
-            Debug.Log("All units have acted this round. Consider ending your turn.");
-            
-            // If there's a UI for ending the turn, we would highlight it here
+            if (showDebugInfo)
+                Debug.Log("All units have acted this round. Ending player turn.");
+                
+            // Automatically end the turn since all units have acted
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.EndPlayerTurn();
+            }
         }
     }
     
@@ -284,16 +339,14 @@ public class UnitSelectionController : MonoBehaviour
         // Filter out units that have already acted this round
         foreach (Unit unit in playerUnits)
         {
-            if (!_unitsActedThisRound.Contains(unit))
+            if (!_unitsActedThisRound.Contains(unit) && unit.IsAlive)
             {
                 _availableUnits.Add(unit);
             }
         }
         
         if (showDebugInfo)
-        {
             Debug.Log($"Available units: {_availableUnits.Count}");
-        }
     }
     
     /// <summary>
@@ -315,6 +368,19 @@ public class UnitSelectionController : MonoBehaviour
             return;
         }
         
+        // Make sure selection is enabled
+        if (!_selectionEnabled)
+        {
+            Debug.LogWarning("Unit selection is currently disabled!");
+            return;
+        }
+        
+        // If there's currently a selected unit, make sure to discard its hand first
+        if (CurrentlySelectedUnit != null && _cardSystem != null)
+        {
+            _cardSystem.DiscardHand(CurrentlySelectedUnit);
+        }
+        
         // Use the Unit's static selection method
         Unit.SelectUnit(unit);
         
@@ -324,10 +390,23 @@ public class UnitSelectionController : MonoBehaviour
         // Start the unit's turn
         unit.StartTurn();
         
+        // Draw cards for this unit
+        if (_cardSystem != null)
+        {
+            _cardSystem.DrawHandForUnit(unit);
+        }
+        
         // Notify any listeners
         OnUnitSelected?.Invoke(unit);
         
-        Debug.Log($"Selected {unit.UnitName} for this turn.");
+        // Also notify the grid manager
+        if (GridManager.Instance != null)
+        {
+            GridManager.Instance.OnUnitSelected(unit);
+        }
+        
+        if (showDebugInfo)
+            Debug.Log($"Selected {unit.UnitName} for this turn.");
     }
     
     /// <summary>
@@ -339,9 +418,9 @@ public class UnitSelectionController : MonoBehaviour
         
         // Find the current unit's index
         int currentIndex = -1;
-        if (Unit.SelectedUnit != null)
+        if (CurrentlySelectedUnit != null)
         {
-            currentIndex = _availableUnits.IndexOf(Unit.SelectedUnit);
+            currentIndex = _availableUnits.IndexOf(CurrentlySelectedUnit);
         }
         
         // Select the next unit in the list
@@ -354,16 +433,24 @@ public class UnitSelectionController : MonoBehaviour
     /// </summary>
     public void HandleUnitClicked(Unit clickedUnit)
     {
-        Debug.Log($"HandleUnitClicked called for {clickedUnit?.UnitName ?? "null"}. Selection enabled: {_selectionEnabled}");
+        if (showDebugInfo)
+            Debug.Log($"HandleUnitClicked called for {clickedUnit?.UnitName ?? "null"}. Selection enabled: {_selectionEnabled}");
         
         // Only process clicks when selection is enabled
-        if (!_selectionEnabled) return;
+        if (!_selectionEnabled) 
+        {
+            if (showDebugInfo)
+                Debug.Log("Selection is disabled - unit is currently active or it's not player turn");
+            return;
+        }
         
         // Verify the unit is valid and available
         if (clickedUnit != null && clickedUnit.Team == Unit.TeamType.Player && 
             clickedUnit.IsAlive && !_unitsActedThisRound.Contains(clickedUnit))
         {
-            Debug.Log($"Unit {clickedUnit.UnitName} is valid for selection");
+            if (showDebugInfo)
+                Debug.Log($"Unit {clickedUnit.UnitName} is valid for selection");
+                
             SelectUnit(clickedUnit);
         }
         else
@@ -385,6 +472,91 @@ public class UnitSelectionController : MonoBehaviour
                 Debug.Log($"Unit {clickedUnit.UnitName} has already acted this round");
             }
         }
+    }
+    
+    /// <summary>
+    /// Mark a unit as ready to act again (useful for abilities that grant extra actions)
+    /// </summary>
+    public void ResetUnitAction(Unit unit)
+    {
+        if (unit != null && _unitsActedThisRound.Contains(unit))
+        {
+            _unitsActedThisRound.Remove(unit);
+            RefreshAvailableUnits();
+            
+            if (showDebugInfo)
+                Debug.Log($"Reset action for {unit.UnitName} - they can act again this round");
+        }
+    }
+    
+    /// <summary>
+    /// End the active unit's turn programmatically (for UI buttons, etc.)
+    /// </summary>
+    public void EndActiveUnitTurn()
+    {
+        if (CurrentlySelectedUnit != null)
+        {
+            // End the unit's turn
+            CurrentlySelectedUnit.EndTurn();
+            
+            // Process the end of turn
+            OnUnitFinishedTurn(CurrentlySelectedUnit);
+        }
+    }
+    
+    #endregion
+
+    #region Unit Management
+    
+    /// <summary>
+    /// Get all units that have acted this round
+    /// </summary>
+    public List<Unit> GetUnitsActedThisRound()
+    {
+        return new List<Unit>(_unitsActedThisRound);
+    }
+    
+    /// <summary>
+    /// Get all units that haven't acted this round yet
+    /// </summary>
+    public List<Unit> GetAvailableUnits()
+    {
+        return new List<Unit>(_availableUnits);
+    }
+    
+    /// <summary>
+    /// Check if a specific unit has already acted this round
+    /// </summary>
+    public bool HasUnitActed(Unit unit)
+    {
+        return unit != null && _unitsActedThisRound.Contains(unit);
+    }
+    
+    /// <summary>
+    /// Check if all player units have acted this round
+    /// </summary>
+    public bool HaveAllUnitsActed()
+    {
+        List<Unit> playerUnits = Unit.GetUnitsOfTeam(Unit.TeamType.Player);
+        
+        // Check if all living player units have acted
+        foreach (Unit unit in playerUnits)
+        {
+            if (unit.IsAlive && !_unitsActedThisRound.Contains(unit))
+            {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    /// <summary>
+    /// Check if selection is currently enabled
+    /// </summary>
+    public bool IsSelectionEnabled()
+    {
+        return _selectionEnabled;
     }
     
     #endregion

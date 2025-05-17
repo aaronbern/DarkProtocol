@@ -1,7 +1,10 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using DarkProtocol.Cards;
+using TMPro;
+using UnityEngine.EventSystems;
 
 namespace DarkProtocol.UI
 {
@@ -13,11 +16,20 @@ namespace DarkProtocol.UI
         #region Inspector Fields
         [Header("Card Layout")]
         [SerializeField] private Transform cardContainer;
+        [SerializeField] private RectTransform cardsPanel;
         [SerializeField] private float cardSpacing = 30f;
         [SerializeField] private float cardElevationSteps = 15f;
         [SerializeField] private float cardFanAngle = 5f;
         [SerializeField] private float selectedCardElevation = 50f;
         [SerializeField] private float cardAnimationSpeed = 0.3f;
+
+        [Header("Visibility")]
+        [SerializeField] private bool cardHandVisible = true;
+        [SerializeField] private float hiddenYPosition = -200f;
+        [SerializeField] private float visibleYPosition = 0f;
+        [SerializeField] private float toggleAnimationSpeed = 0.3f;
+        [SerializeField] private Button toggleCardsButton;
+        [SerializeField] private GameObject cardsHiddenIndicator;
         
         [Header("Interaction")]
         [SerializeField] private bool allowDragging = true;
@@ -29,13 +41,20 @@ namespace DarkProtocol.UI
         [SerializeField] private GameObject targetingLinePrefab;
         [SerializeField] private Color validTargetColor = Color.green;
         [SerializeField] private Color invalidTargetColor = Color.red;
+        [SerializeField] private AudioSource audioSource;
+        [SerializeField] private AudioClip cardDrawSound;
+        [SerializeField] private AudioClip cardPlaySound;
+        [SerializeField] private AudioClip cardDiscardSound;
+        [SerializeField] private AudioClip toggleSound;
         
         [Header("UI References")]
         [SerializeField] private GameObject cardInfoPanel;
-        [SerializeField] private TMPro.TextMeshProUGUI cardNameText;
-        [SerializeField] private TMPro.TextMeshProUGUI cardDescriptionText;
+        [SerializeField] private TextMeshProUGUI cardNameText;
+        [SerializeField] private TextMeshProUGUI cardDescriptionText;
         [SerializeField] private Image cardArtworkImage;
+        [SerializeField] private TextMeshProUGUI actionPointCostText;
         [SerializeField] private Button cancelButton;
+        [SerializeField] private Button playCardButton;
         
         [Header("Debug")]
         [SerializeField] private bool showDebugInfo = false;
@@ -61,9 +80,17 @@ namespace DarkProtocol.UI
         
         // Card animation
         private bool _animatingCards = false;
+        private Coroutine _toggleAnimationCoroutine = null;
         
         // Card system reference
         private CardSystem _cardSystem;
+        
+        // Card positioning state
+        private Vector2 _handOriginalPosition;
+        private bool _isHandTransitioning = false;
+        
+        // Show/hide state
+        private bool _isCardHandVisible = true;
         #endregion
 
         #region Unity Lifecycle
@@ -91,11 +118,41 @@ namespace DarkProtocol.UI
                 cancelButton.onClick.AddListener(CancelTargeting);
                 cancelButton.gameObject.SetActive(false);
             }
+
+            // Set up play card button
+            if (playCardButton != null)
+            {
+                toggleCardsButton.onClick.AddListener(() => ToggleCardHandVisibility());
+                playCardButton.gameObject.SetActive(false);
+            }
             
             // Hide card info panel by default
             if (cardInfoPanel != null)
             {
                 cardInfoPanel.SetActive(false);
+            }
+
+            // Set up toggle cards button
+            if (toggleCardsButton != null)
+            {
+                toggleCardsButton.onClick.AddListener(ToggleCardHandVisibility);
+            }
+
+            // Store original position
+            if (cardsPanel != null)
+            {
+                _handOriginalPosition = cardsPanel.anchoredPosition;
+            }
+
+            // Initialize visibility
+            _isCardHandVisible = cardHandVisible;
+            UpdateCardHandVisibility(false); // No animation at start
+            
+            // Add audio source if needed
+            if (audioSource == null)
+            {
+                audioSource = gameObject.AddComponent<AudioSource>();
+                audioSource.playOnAwake = false;
             }
         }
         
@@ -105,6 +162,8 @@ namespace DarkProtocol.UI
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.OnTurnChanged += HandleTurnChanged;
+                GameManager.Instance.OnUnitActivated += HandleUnitActivated;
+                GameManager.Instance.OnUnitDeactivated += HandleUnitDeactivated;
             }
         }
         
@@ -123,6 +182,8 @@ namespace DarkProtocol.UI
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.OnTurnChanged -= HandleTurnChanged;
+                GameManager.Instance.OnUnitActivated -= HandleUnitActivated;
+                GameManager.Instance.OnUnitDeactivated -= HandleUnitDeactivated;
             }
             
             // Clean up targeting line
@@ -130,6 +191,13 @@ namespace DarkProtocol.UI
             {
                 Destroy(_targetingLine);
                 _targetingLine = null;
+            }
+
+            // Stop any active coroutines
+            if (_toggleAnimationCoroutine != null)
+            {
+                StopCoroutine(_toggleAnimationCoroutine);
+                _toggleAnimationCoroutine = null;
             }
         }
         
@@ -140,6 +208,12 @@ namespace DarkProtocol.UI
             {
                 UpdateTargeting();
             }
+
+            // Handle keyboard shortcuts
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                ToggleCardHandVisibility();
+            }
         }
         #endregion
 
@@ -147,7 +221,7 @@ namespace DarkProtocol.UI
         /// <summary>
         /// Update the card hand based on current hand
         /// </summary>
-        public void UpdateHand(List<Card> cards)
+        public void UpdateHand(List<Card> cards, bool animate = true)
         {
             // Clear the current hand
             ClearHand();
@@ -156,7 +230,13 @@ namespace DarkProtocol.UI
             _currentHand = new List<Card>(cards);
             
             // Arrange the cards in the hand
-            ArrangeCards();
+            ArrangeCards(animate);
+
+            // Play card draw sound
+            if (audioSource != null && cardDrawSound != null && cards.Count > 0)
+            {
+                audioSource.PlayOneShot(cardDrawSound);
+            }
         }
         
         /// <summary>
@@ -181,6 +261,11 @@ namespace DarkProtocol.UI
             {
                 cancelButton.gameObject.SetActive(false);
             }
+
+            if (playCardButton != null)
+            {
+                playCardButton.gameObject.SetActive(false);
+            }
             
             if (cardInfoPanel != null)
             {
@@ -191,7 +276,7 @@ namespace DarkProtocol.UI
         /// <summary>
         /// Arrange cards in a fan layout
         /// </summary>
-        private void ArrangeCards()
+        private void ArrangeCards(bool animate = true)
         {
             if (_currentHand.Count == 0 || cardContainer == null)
                 return;
@@ -199,8 +284,15 @@ namespace DarkProtocol.UI
             // Calculate positions
             CalculateCardPositions();
             
-            // Animate cards to position
-            StartCoroutine(AnimateCardsToPosition());
+            // Animate cards to position or place immediately
+            if (animate)
+            {
+                StartCoroutine(AnimateCardsToPosition());
+            }
+            else
+            {
+                PlaceCardsImmediately();
+            }
         }
         
         /// <summary>
@@ -240,8 +332,9 @@ namespace DarkProtocol.UI
                     float angle = Mathf.Lerp(-cardFanAngle, cardFanAngle, (float)i / (cardCount - 1));
                     _cardRotations[i] = Quaternion.Euler(0, 0, angle);
                     
-                    // Card scale
-                    _cardScales[i] = Vector3.one;
+                    // Card scale - gradually increase as it moves away from center
+                    float scaleFactor = 1f - Mathf.Abs(i - (cardCount - 1) / 2f) * 0.03f;
+                    _cardScales[i] = Vector3.one * scaleFactor;
                 }
             }
             
@@ -252,13 +345,38 @@ namespace DarkProtocol.UI
                 Vector2 pos = _cardPositions[_selectedCardIndex];
                 pos.y += selectedCardElevation;
                 _cardPositions[_selectedCardIndex] = pos;
+                
+                // Adjust scale of selected card
+                _cardScales[_selectedCardIndex] = Vector3.one * 1.1f;
+            }
+        }
+        
+        /// <summary>
+        /// Place cards immediately in their positions (no animation)
+        /// </summary>
+        private void PlaceCardsImmediately()
+        {
+            for (int i = 0; i < _currentHand.Count; i++)
+            {
+                Card card = _currentHand[i];
+                RectTransform cardRect = card.GetComponent<RectTransform>();
+                
+                if (cardRect != null)
+                {
+                    cardRect.anchoredPosition = _cardPositions[i];
+                    cardRect.localRotation = _cardRotations[i];
+                    cardRect.localScale = _cardScales[i];
+                }
+                
+                // Make the card active
+                card.gameObject.SetActive(true);
             }
         }
         
         /// <summary>
         /// Animate cards to their calculated positions
         /// </summary>
-        private System.Collections.IEnumerator AnimateCardsToPosition()
+        private IEnumerator AnimateCardsToPosition()
         {
             _animatingCards = true;
             
@@ -277,26 +395,58 @@ namespace DarkProtocol.UI
             // Animate cards to position
             if (instantPlacement)
             {
-                // Place cards instantly
+                // Animate from bottom of screen to position
                 for (int i = 0; i < _currentHand.Count; i++)
                 {
                     Card card = _currentHand[i];
                     RectTransform cardRect = card.GetComponent<RectTransform>();
                     
+                    // Set initial position at bottom of screen
                     if (cardRect != null)
                     {
-                        cardRect.anchoredPosition = _cardPositions[i];
+                        cardRect.anchoredPosition = new Vector2(_cardPositions[i].x, _cardPositions[i].y - 300f);
                         cardRect.localRotation = _cardRotations[i];
-                        cardRect.localScale = _cardScales[i];
+                        cardRect.localScale = _cardScales[i] * 0.8f; // Start smaller
                     }
                     
                     // Make the card active
                     card.gameObject.SetActive(true);
+                    
+                    // Add a small delay between each card draw
+                    yield return new WaitForSeconds(0.1f);
+                }
+                
+                // Animate to final positions
+                float animationTime = 0f;
+                while (animationTime < 1f)
+                {
+                    animationTime += Time.deltaTime / cardAnimationSpeed;
+                    float t = Mathf.SmoothStep(0f, 1f, animationTime);
+                    
+                    for (int i = 0; i < _currentHand.Count; i++)
+                    {
+                        Card card = _currentHand[i];
+                        RectTransform cardRect = card.GetComponent<RectTransform>();
+                        
+                        if (cardRect != null)
+                        {
+                            // Animate position from bottom
+                            Vector2 startPos = new Vector2(_cardPositions[i].x, _cardPositions[i].y - 300f);
+                            Vector2 targetPos = _cardPositions[i];
+                            Vector3 startScale = _cardScales[i] * 0.8f;
+                            Vector3 targetScale = _cardScales[i];
+                            
+                            cardRect.anchoredPosition = Vector2.Lerp(startPos, targetPos, t);
+                            cardRect.localScale = Vector3.Lerp(startScale, targetScale, t);
+                        }
+                    }
+                    
+                    yield return null;
                 }
             }
             else
             {
-                // Animate cards to position
+                // Animate cards to position when reorganizing
                 float animationTime = 0f;
                 
                 while (animationTime < 1f)
@@ -321,9 +471,6 @@ namespace DarkProtocol.UI
                             cardRect.localRotation = Quaternion.Slerp(cardRect.localRotation, targetRot, t);
                             cardRect.localScale = Vector3.Lerp(cardRect.localScale, targetScale, t);
                         }
-                        
-                        // Make sure the card is active
-                        card.gameObject.SetActive(true);
                     }
                     
                     yield return null;
@@ -385,10 +532,22 @@ namespace DarkProtocol.UI
                 if (_selectedCard.CardData.RequiresTarget)
                 {
                     StartTargeting();
+                    
+                    // Hide play button in targeting mode
+                    if (playCardButton != null)
+                    {
+                        playCardButton.gameObject.SetActive(false);
+                    }
                 }
                 else
                 {
                     _isTargeting = false;
+                    
+                    // Show play button for non-targeting cards
+                    if (playCardButton != null)
+                    {
+                        playCardButton.gameObject.SetActive(true);
+                    }
                 }
                 
                 // Rearrange cards
@@ -400,6 +559,12 @@ namespace DarkProtocol.UI
             {
                 _selectedCardIndex = -1;
                 HideCardInfo();
+                
+                // Hide play button
+                if (playCardButton != null)
+                {
+                    playCardButton.gameObject.SetActive(false);
+                }
             }
         }
         
@@ -426,6 +591,12 @@ namespace DarkProtocol.UI
                 
                 // Hide card info
                 HideCardInfo();
+                
+                // Hide play button
+                if (playCardButton != null)
+                {
+                    playCardButton.gameObject.SetActive(false);
+                }
                 
                 // Rearrange cards
                 ArrangeCards();
@@ -516,7 +687,7 @@ namespace DarkProtocol.UI
                     _currentTarget = isValidTarget ? unit : null;
                     
                     // Check for mouse click to play card
-                    if (Input.GetMouseButtonDown(0) && isValidTarget)
+                    if (Input.GetMouseButtonDown(0) && !EventSystem.current.IsPointerOverGameObject() && isValidTarget)
                     {
                         PlaySelectedCard(_currentTarget);
                     }
@@ -621,7 +792,7 @@ namespace DarkProtocol.UI
         /// <summary>
         /// Play the selected card on a target
         /// </summary>
-        private void PlaySelectedCard(Unit target)
+        private void PlaySelectedCard(Unit target = null)
         {
             if (_selectedCard == null)
                 return;
@@ -633,6 +804,12 @@ namespace DarkProtocol.UI
                 
                 if (success)
                 {
+                    // Play sound
+                    if (audioSource != null && cardPlaySound != null)
+                    {
+                        audioSource.PlayOneShot(cardPlaySound);
+                    }
+                    
                     // Show play effect
                     if (playEffectPrefab != null && target != null)
                     {
@@ -644,13 +821,112 @@ namespace DarkProtocol.UI
                     EndTargeting();
                     
                     // Card will be removed from hand by the card system via the HandleCardPlayed event
-                    DebugLog($"Played card {_selectedCard.CardName} on {target.UnitName}");
+                    DebugLog($"Played card {_selectedCard.CardName} on {(target != null ? target.UnitName : "no target")}");
                 }
                 else
                 {
                     DebugLog($"Failed to play card {_selectedCard.CardName}");
                 }
             }
+        }
+        #endregion
+
+        #region Card Hand Visibility
+        /// <summary>
+        /// Toggle the visibility of the card hand
+        /// </summary>
+        public void ToggleCardHandVisibility()
+        {
+            // Toggle state
+            _isCardHandVisible = !_isCardHandVisible;
+            
+            // Update visibility with animation
+            UpdateCardHandVisibility(true);
+            
+            // Play toggle sound
+            if (audioSource != null && toggleSound != null)
+            {
+                audioSource.PlayOneShot(toggleSound);
+            }
+        }
+        
+        /// <summary>
+        /// Update the card hand visibility based on current state
+        /// </summary>
+        private void UpdateCardHandVisibility(bool animate)
+        {
+            if (cardsPanel == null)
+                return;
+                
+            // Update card panel visibility indicator
+            if (cardsHiddenIndicator != null)
+            {
+                cardsHiddenIndicator.SetActive(!_isCardHandVisible);
+            }
+            
+            // Calculate target position
+            Vector2 targetPosition = _handOriginalPosition;
+            if (!_isCardHandVisible)
+            {
+                targetPosition.y = hiddenYPosition;
+            }
+            else
+            {
+                targetPosition.y = visibleYPosition;
+            }
+            
+            // Apply the change with or without animation
+            if (animate)
+            {
+                // Stop any running animations
+                if (_toggleAnimationCoroutine != null)
+                {
+                    StopCoroutine(_toggleAnimationCoroutine);
+                }
+                
+                // Start new animation
+                _toggleAnimationCoroutine = StartCoroutine(AnimateCardHandPosition(targetPosition));
+            }
+            else
+            {
+                // Immediately set position
+                cardsPanel.anchoredPosition = targetPosition;
+            }
+        }
+        
+        /// <summary>
+        /// Animate the card hand to a new position
+        /// </summary>
+        private IEnumerator AnimateCardHandPosition(Vector2 targetPosition)
+        {
+            _isHandTransitioning = true;
+            
+            Vector2 startPosition = cardsPanel.anchoredPosition;
+            float animationTime = 0f;
+            
+            while (animationTime < 1f)
+            {
+                animationTime += Time.deltaTime / toggleAnimationSpeed;
+                float t = Mathf.SmoothStep(0f, 1f, animationTime);
+                
+                cardsPanel.anchoredPosition = Vector2.Lerp(startPosition, targetPosition, t);
+                
+                yield return null;
+            }
+            
+            // Ensure final position
+            cardsPanel.anchoredPosition = targetPosition;
+            
+            _isHandTransitioning = false;
+            _toggleAnimationCoroutine = null;
+        }
+        
+        /// <summary>
+        /// Get the current visibility state of the card hand
+        /// </summary>
+        public bool IsCardHandVisible()
+        {
+            return _isCardHandVisible;
         }
         #endregion
 
@@ -679,6 +955,11 @@ namespace DarkProtocol.UI
                 cardArtworkImage.sprite = card.CardData.CardArtwork;
                 cardArtworkImage.enabled = true;
             }
+
+            if (actionPointCostText != null)
+            {
+                actionPointCostText.text = card.ActionPointCost.ToString();
+            }
             
             // Show the panel
             cardInfoPanel.SetActive(true);
@@ -704,6 +985,15 @@ namespace DarkProtocol.UI
         {
             switch (newState)
             {
+                case GameManager.TurnState.PlayerTurn:
+                    // Make sure card hand is visible at start of player turn
+                    if (!_isCardHandVisible)
+                    {
+                        _isCardHandVisible = true;
+                        UpdateCardHandVisibility(true);
+                    }
+                    break;
+                    
                 case GameManager.TurnState.PlayerTurnEnd:
                 case GameManager.TurnState.EnemyTurnEnd:
                     // Clear hand and UI
@@ -748,6 +1038,12 @@ namespace DarkProtocol.UI
                 _selectedCard = null;
                 _selectedCardIndex = -1;
                 HideCardInfo();
+                
+                // Hide play button
+                if (playCardButton != null)
+                {
+                    playCardButton.gameObject.SetActive(false);
+                }
             }
             
             // Rearrange remaining cards
@@ -759,6 +1055,12 @@ namespace DarkProtocol.UI
         /// </summary>
         private void HandleCardDiscarded(Card card)
         {
+            // Play discard sound
+            if (audioSource != null && cardDiscardSound != null)
+            {
+                audioSource.PlayOneShot(cardDiscardSound);
+            }
+            
             // Same as card played for now
             _currentHand.Remove(card);
             
@@ -768,10 +1070,42 @@ namespace DarkProtocol.UI
                 _selectedCard = null;
                 _selectedCardIndex = -1;
                 HideCardInfo();
+                
+                // Hide play button
+                if (playCardButton != null)
+                {
+                    playCardButton.gameObject.SetActive(false);
+                }
             }
             
             // Rearrange remaining cards
             ArrangeCards();
+        }
+
+        /// <summary>
+        /// Handle unit activation event from GameManager
+        /// </summary>
+        private void HandleUnitActivated(Unit unit)
+        {
+            // If a new unit is activated, make sure card panel is visible
+            if (unit != null && unit.Team == Unit.TeamType.Player)
+            {
+                // Make sure card hand is visible
+                if (!_isCardHandVisible)
+                {
+                    _isCardHandVisible = true;
+                    UpdateCardHandVisibility(true);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Handle unit deactivation event from GameManager
+        /// </summary>
+        private void HandleUnitDeactivated(Unit unit)
+        {
+            // Clear any selected card
+            DeselectCard();
         }
         #endregion
 
