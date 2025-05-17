@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using DarkProtocol.Cards;
 using TMPro;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 
 namespace DarkProtocol.UI
 {
@@ -91,11 +92,19 @@ namespace DarkProtocol.UI
         
         // Show/hide state
         private bool _isCardHandVisible = true;
+        
+        // Input references
+        private Mouse _mouse;
+        private Keyboard _keyboard;
         #endregion
 
         #region Unity Lifecycle
         private void Awake()
         {
+            // Get input references
+            _mouse = Mouse.current;
+            _keyboard = Keyboard.current;
+            
             // Get card system reference
             _cardSystem = CardSystem.Instance;
             
@@ -122,20 +131,20 @@ namespace DarkProtocol.UI
             // Set up play card button
             if (playCardButton != null)
             {
-                toggleCardsButton.onClick.AddListener(() => ToggleCardHandVisibility());
+                playCardButton.onClick.AddListener(() => PlaySelectedCard(null));
                 playCardButton.gameObject.SetActive(false);
+            }
+            
+            // Set up toggle cards button
+            if (toggleCardsButton != null)
+            {
+                toggleCardsButton.onClick.AddListener(ToggleCardHandVisibility);
             }
             
             // Hide card info panel by default
             if (cardInfoPanel != null)
             {
                 cardInfoPanel.SetActive(false);
-            }
-
-            // Set up toggle cards button
-            if (toggleCardsButton != null)
-            {
-                toggleCardsButton.onClick.AddListener(ToggleCardHandVisibility);
             }
 
             // Store original position
@@ -203,16 +212,16 @@ namespace DarkProtocol.UI
         
         private void Update()
         {
+            // Check for keyboard input
+            if (_keyboard != null && _keyboard.spaceKey.wasPressedThisFrame)
+            {
+                ToggleCardHandVisibility();
+            }
+
             // Handle targeting
             if (_isTargeting && _selectedCard != null)
             {
                 UpdateTargeting();
-            }
-
-            // Handle keyboard shortcuts
-            if (Input.GetKeyDown(KeyCode.Space))
-            {
-                ToggleCardHandVisibility();
             }
         }
         #endregion
@@ -659,11 +668,11 @@ namespace DarkProtocol.UI
         /// </summary>
         private void UpdateTargeting()
         {
-            if (!_isTargeting || _selectedCard == null)
+            if (!_isTargeting || _selectedCard == null || _mouse == null)
                 return;
                 
             // Get mouse position
-            Vector2 mousePosition = Input.mousePosition;
+            Vector2 mousePosition = _mouse.position.ReadValue();
             
             // Create ray from mouse position
             Ray ray = Camera.main.ScreenPointToRay(mousePosition);
@@ -687,7 +696,7 @@ namespace DarkProtocol.UI
                     _currentTarget = isValidTarget ? unit : null;
                     
                     // Check for mouse click to play card
-                    if (Input.GetMouseButtonDown(0) && !EventSystem.current.IsPointerOverGameObject() && isValidTarget)
+                    if (_mouse.leftButton.wasPressedThisFrame && !EventSystem.current.IsPointerOverGameObject() && isValidTarget)
                     {
                         PlaySelectedCard(_currentTarget);
                     }
@@ -708,7 +717,7 @@ namespace DarkProtocol.UI
             }
             
             // Check for right click to cancel targeting
-            if (Input.GetMouseButtonDown(1))
+            if (_mouse.rightButton.wasPressedThisFrame)
             {
                 CancelTargeting();
             }
