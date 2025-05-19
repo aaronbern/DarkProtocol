@@ -13,28 +13,30 @@ namespace DarkProtocol.Grid
         private readonly IUnitGridService _unitService;
         private readonly IPathfindingService _pathfindingService;
         private readonly IGridVisualizationService _visualizationService;
-        
+
         // Reference to the main camera
         private Camera _mainCamera;
-        
+
         // Input enabled flag
         private bool _inputEnabled = true;
-        
+
         // Reference to the unit selection controller
         private UnitSelectionController _unitSelectionController;
-        
+
         // Cache for hover pathfinding performance optimization
         private Vector2Int _lastHoveredGridPos = new Vector2Int(-1, -1); // Invalid position to force first calculation
         private bool _lastHoverWasValid = false;
-        
+
         // Throttling for hover processing - only process hover every few frames
         private int _hoverFrameSkip = 5; // Process hover every 5 frames
         private int _currentFrame = 0;
         private Unit _lastPathUnit = null;
         private Vector2Int _lastHoveredPosition = new Vector2Int(-1, -1);
-        // Debug setting
+
+        // Debug settings
         private bool _showDetailedDebugLogs = false;
-        
+        private bool _suppressGroundHitLogs = true; // Added to suppress common ground hit logs
+
         /// <summary>
         /// Constructor
         /// </summary>
@@ -53,29 +55,29 @@ namespace DarkProtocol.Grid
             _pathfindingService = pathfindingService;
             _visualizationService = visualizationService;
         }
-        
+
         /// <summary>
         /// Initialize the input service
         /// </summary>
         public void Initialize()
         {
             _mainCamera = Camera.main;
-            
+
             if (_mainCamera == null)
             {
                 Debug.LogWarning("No main camera found! GridInputService requires a camera tagged as 'MainCamera'.");
             }
-            
+
             _unitSelectionController = Object.FindFirstObjectByType<UnitSelectionController>();
-            
+
             if (_unitSelectionController == null)
             {
                 Debug.LogWarning("UnitSelectionController not found! Some input functionality may not work.");
             }
-            
+
             Debug.Log("GridInputService initialized");
         }
-        
+
         /// <summary>
         /// Enable grid input handling
         /// </summary>
@@ -84,16 +86,16 @@ namespace DarkProtocol.Grid
             _inputEnabled = true;
             // Reset hover cache to force recalculation on next hover
             _lastHoveredGridPos = new Vector2Int(-1, -1);
-            Debug.Log("Grid input enabled");
+            DebugLog("Grid input enabled");
         }
-        
+
         /// <summary>
         /// Disable grid input handling
         /// </summary>
         public void DisableInput()
         {
             _inputEnabled = false;
-            Debug.Log("Grid input disabled");
+            DebugLog("Grid input disabled");
         }
 
         /// <summary>
@@ -128,7 +130,13 @@ namespace DarkProtocol.Grid
             }
             else if (!leftMousePressed && !Mouse.current.leftButton.isPressed && !Mouse.current.rightButton.isPressed)
             {
-                HandleMouseHover(ray);
+                // For hover, implement frame throttling
+                _currentFrame++;
+                if (_currentFrame >= _hoverFrameSkip)
+                {
+                    _currentFrame = 0;
+                    HandleMouseHover(ray);
+                }
             }
         }
 
@@ -140,28 +148,27 @@ namespace DarkProtocol.Grid
         {
             // Get the currently selected unit
             Unit selectedUnit = Unit.SelectedUnit;
-            
+
             if (selectedUnit == null)
                 return;
-                
+
             if (Physics.Raycast(ray, out RaycastHit hit))
             {
-                if (_showDetailedDebugLogs)
-                    Debug.Log($"Right click detected - hit: {hit.collider.gameObject.name}");
-                
+                DebugLog($"Right click detected - hit: {hit.collider.gameObject.name}");
+
                 // Check if we hit a movement range collider
                 GridPositionMarker marker = hit.collider.GetComponent<GridPositionMarker>();
                 if (marker != null)
                 {
                     Vector2Int gridPos = marker.GridPosition;
-                    
+
                     // Check if tile is occupied
                     if (_gridService.IsTileOccupied(gridPos.x, gridPos.y))
                     {
                         Debug.LogWarning($"Cannot move to position {gridPos} - tile is occupied");
                         return;
                     }
-                    
+
                     // Move the unit
                     _unitService.MoveUnitToPosition(selectedUnit, gridPos);
                 }
@@ -176,27 +183,25 @@ namespace DarkProtocol.Grid
                             Debug.LogWarning($"Cannot move to position {gridPos} - tile is occupied");
                             return;
                         }
-                        
+
                         // Get the unit's movement range from the visualization service
                         var unitGridPos = Vector2Int.zero;
                         _unitService.GetUnitGridPosition(selectedUnit, out unitGridPos);
-                        
+
                         // Calculate movement range
                         List<Vector2Int> movementRange = _pathfindingService.CalculateMovementRange(unitGridPos, selectedUnit.CurrentMovementPoints);
-                        
+
                         // Check if this is a valid movement tile
                         if (movementRange.Contains(gridPos))
                         {
-                            if (_showDetailedDebugLogs)
-                                Debug.Log($"Moving unit to grid position: {gridPos}");
-                                
+                            DebugLog($"Moving unit to grid position: {gridPos}");
+
                             // Move the unit
                             _unitService.MoveUnitToPosition(selectedUnit, gridPos);
                         }
                         else
                         {
-                            if (_showDetailedDebugLogs)
-                                Debug.Log($"Position {gridPos} is not in movement range");
+                            DebugLog($"Position {gridPos} is not in movement range");
                         }
                     }
                 }
@@ -235,7 +240,14 @@ namespace DarkProtocol.Grid
             // Cast ray
             if (Physics.Raycast(ray, out RaycastHit hit, 100f))
             {
-                Debug.Log($"Mouse hover hit: {hit.collider.gameObject.name}");
+                // Only log if it's not a ground hit or if we're not suppressing ground logs
+                string hitObjectName = hit.collider.gameObject.name;
+                bool isGroundHit = hitObjectName.Contains("Ground") || hitObjectName.Contains("Terrain") || hitObjectName.Contains("Floor");
+
+                if (!isGroundHit || !_suppressGroundHitLogs)
+                {
+                    DebugLog($"Mouse hover hit: {hitObjectName}");
+                }
 
                 // Check if we hit a GridPositionMarker
                 GridPositionMarker marker = hit.collider.GetComponent<GridPositionMarker>();
@@ -243,12 +255,12 @@ namespace DarkProtocol.Grid
                 {
                     hoveredGridPos = marker.GridPosition;
                     foundValidPosition = true;
-                    Debug.Log($"Found grid marker at position {hoveredGridPos}");
+                    DebugLog($"Found grid marker at position {hoveredGridPos}");
                 }
                 else if (_gridService.WorldToGridPosition(hit.point, out hoveredGridPos))
                 {
                     foundValidPosition = true;
-                    Debug.Log($"Converted hit point to grid position {hoveredGridPos}");
+                    DebugLog($"Converted hit point to grid position {hoveredGridPos}");
                 }
             }
 
@@ -291,6 +303,33 @@ namespace DarkProtocol.Grid
                 _visualizationService.ClearPathVisualization();
                 _lastHoveredPosition = new Vector2Int(-1, -1);
             }
+        }
+
+        /// <summary>
+        /// Log debug messages only if detailed logging is enabled
+        /// </summary>
+        private void DebugLog(string message)
+        {
+            if (_showDetailedDebugLogs)
+            {
+                Debug.Log(message);
+            }
+        }
+
+        /// <summary>
+        /// Enable or disable detailed debug logs
+        /// </summary>
+        public void SetDetailedLogging(bool enable)
+        {
+            _showDetailedDebugLogs = enable;
+        }
+
+        /// <summary>
+        /// Enable or disable ground hit logs
+        /// </summary>
+        public void SetGroundHitLogging(bool enable)
+        {
+            _suppressGroundHitLogs = !enable;
         }
     }
 }

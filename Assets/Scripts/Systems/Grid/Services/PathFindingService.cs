@@ -9,17 +9,22 @@ namespace DarkProtocol.Grid
     public class PathfindingService : IPathfindingService
     {
         private readonly IGridService _gridService;
-        
+
         /// <summary>
         /// Cache of recently calculated paths for performance
         /// </summary>
         private Dictionary<string, List<Vector2Int>> _pathCache = new Dictionary<string, List<Vector2Int>>();
-        
+
         /// <summary>
         /// Maximum size of the path cache
         /// </summary>
         private const int MaxCacheSize = 100;
-        
+
+        /// <summary>
+        /// Flag to control debug logging
+        /// </summary>
+        private bool _enableDebugLogs = false;
+
         /// <summary>
         /// Constructor
         /// </summary>
@@ -41,60 +46,60 @@ namespace DarkProtocol.Grid
             // Check if the grid service is valid
             if (_gridService == null || _gridService.GridData == null)
             {
-                Debug.LogError("Cannot find path: Grid service or GridData is null");
+                if (_enableDebugLogs) Debug.LogError("Cannot find path: Grid service or GridData is null");
                 return null;
             }
-            
+
             // Validate positions
             if (!_gridService.IsValidPosition(start.x, start.y))
             {
-                Debug.LogWarning($"Invalid start position for pathfinding: {start}");
+                if (_enableDebugLogs) Debug.LogWarning($"Invalid start position for pathfinding: {start}");
                 return null;
             }
-            
+
             if (!_gridService.IsValidPosition(end.x, end.y))
             {
-                Debug.LogWarning($"Invalid end position for pathfinding: {end}");
+                if (_enableDebugLogs) Debug.LogWarning($"Invalid end position for pathfinding: {end}");
                 return null;
             }
-            
+
             // Check if end is walkable and not occupied (unless ignoring occupancy)
             TileData endTile = _gridService.GridData.GetTileData(end);
-            if (endTile != null) 
+            if (endTile != null)
             {
                 if (!endTile.IsWalkable)
                 {
-                    Debug.LogWarning($"End position is not walkable: {end}");
+                    if (_enableDebugLogs) Debug.LogWarning($"End position is not walkable: {end}");
                     return null;
                 }
-                
+
                 if (endTile.IsOccupied && !ignoreOccupied)
                 {
                     var occupant = _gridService.GridData.GetOccupant(end.x, end.y);
-                    Debug.LogWarning($"End position {end} is occupied by: {(occupant ? occupant.name : "unknown")}");
+                    if (_enableDebugLogs) Debug.LogWarning($"End position {end} is occupied by: {(occupant ? occupant.name : "unknown")}");
                     return null;
                 }
             }
-            
+
             // Special case: If start and end are the same, return just the start
             if (start == end)
             {
                 return new List<Vector2Int> { start };
             }
-            
+
             // Check cache for identical path request
             string cacheKey = $"{start.x},{start.y}_{end.x},{end.y}_{ignoreOccupied}";
             if (_pathCache.TryGetValue(cacheKey, out List<Vector2Int> cachedPath))
             {
-                Debug.Log($"Using cached path from {start} to {end}");
+                if (_enableDebugLogs) Debug.Log($"Using cached path from {start} to {end}");
                 return new List<Vector2Int>(cachedPath); // Return copy to prevent modifications
             }
-            
+
             // Create a direct path for testing
             bool isHorizontal = start.y == end.y;
             bool isVertical = start.x == end.x;
             bool isDiagonal = Mathf.Abs(start.x - end.x) == Mathf.Abs(start.y - end.y);
-            
+
             // For direct paths (horizontal, vertical, or perfect diagonal), try a simple path first
             if (isHorizontal || isVertical || isDiagonal)
             {
@@ -106,17 +111,17 @@ namespace DarkProtocol.Grid
                     return directPath;
                 }
             }
-            
+
             // Forward to the grid data's more complex A* algorithm if direct path doesn't work
             List<Vector2Int> path = _gridService.GridData.FindPath(start, end, ignoreOccupied);
-            
+
             // If we still don't have a path, try a more lenient approach
             if (path == null || path.Count <= 1)
             {
-                Debug.LogWarning($"Standard A* could not find path from {start} to {end}. Trying alternative pathfinding...");
+                if (_enableDebugLogs) Debug.LogWarning($"Standard A* could not find path from {start} to {end}. Trying alternative pathfinding...");
                 path = FindAlternativePath(start, end, ignoreOccupied);
             }
-            
+
             // Cache the result if successful
             if (path != null && path.Count > 1)
             {
@@ -131,14 +136,14 @@ namespace DarkProtocol.Grid
                         _pathCache.Remove(keys[i]);
                     }
                 }
-                
+
                 _pathCache[cacheKey] = new List<Vector2Int>(path);
-                Debug.Log($"Cached new path from {start} to {end} (cache size: {_pathCache.Count})");
+                if (_enableDebugLogs) Debug.Log($"Cached new path from {start} to {end} (cache size: {_pathCache.Count})");
             }
-            
+
             return path;
         }
-        
+
         /// <summary>
         /// Calculate the movement range for a unit from a starting position
         /// </summary>
@@ -150,14 +155,14 @@ namespace DarkProtocol.Grid
             // Check if the grid service is valid
             if (_gridService == null || _gridService.GridData == null)
             {
-                Debug.LogWarning("Cannot calculate movement range: Grid service or GridData is null");
+                if (_enableDebugLogs) Debug.LogWarning("Cannot calculate movement range: Grid service or GridData is null");
                 return new List<Vector2Int>();
             }
-            
+
             // Forward to the grid data
             return _gridService.GridData.CalculateMovementRange(start, movementPoints);
         }
-        
+
         /// <summary>
         /// Check if a path exists between two points
         /// </summary>
@@ -169,7 +174,7 @@ namespace DarkProtocol.Grid
             List<Vector2Int> path = FindPath(start, end);
             return path != null && path.Count > 1;
         }
-        
+
         /// <summary>
         /// Calculate the movement cost between two positions
         /// </summary>
@@ -179,44 +184,53 @@ namespace DarkProtocol.Grid
         public float CalculatePathCost(Vector2Int start, Vector2Int end)
         {
             List<Vector2Int> path = FindPath(start, end);
-            
+
             if (path == null || path.Count <= 1)
             {
                 return float.MaxValue;
             }
-            
+
             float totalCost = 0;
-            
+
             // Calculate movement cost (sum of tile costs along path)
             for (int i = 1; i < path.Count; i++) // Start from 1 to skip the starting tile
             {
                 TileData tileData = _gridService.GridData.GetTileData(path[i]);
                 totalCost += tileData.MovementCost;
             }
-            
+
             return totalCost;
         }
-        
+
         /// <summary>
         /// Clear the path cache
         /// </summary>
         public void ClearPathCache()
         {
             _pathCache.Clear();
-            Debug.Log("Path cache cleared");
+            if (_enableDebugLogs) Debug.Log("Path cache cleared");
         }
-        
+
+        /// <summary>
+        /// Enable or disable debug logging
+        /// </summary>
+        /// <param name="enable">Whether to enable logging</param>
+        public void SetDebugLogging(bool enable)
+        {
+            _enableDebugLogs = enable;
+        }
+
         // Try to find a direct path (horizontal, vertical, or diagonal)
         private List<Vector2Int> TryDirectPath(Vector2Int start, Vector2Int end, bool ignoreOccupied)
         {
             List<Vector2Int> path = new List<Vector2Int> { start };
             Vector2Int current = start;
-            
+
             // Check if direct path is possible by testing each tile in between
             while (current != end)
             {
                 Vector2Int next = GetNextDirectStep(current, end);
-                
+
                 // Check if the next tile is walkable
                 if (_gridService.IsValidPosition(next.x, next.y))
                 {
@@ -238,39 +252,39 @@ namespace DarkProtocol.Grid
                     return null;
                 }
             }
-            
+
             return path;
         }
-        
+
         // Get the next step in a direct path
         private Vector2Int GetNextDirectStep(Vector2Int current, Vector2Int target)
         {
             Vector2Int step = current;
-            
+
             // Move one step closer in both directions if needed
             if (current.x < target.x) step.x++;
             else if (current.x > target.x) step.x--;
-            
+
             if (current.y < target.y) step.y++;
             else if (current.y > target.y) step.y--;
-            
+
             return step;
         }
-        
+
         // Alternative pathfinding when regular A* fails
         private List<Vector2Int> FindAlternativePath(Vector2Int start, Vector2Int end, bool ignoreOccupied)
         {
             // This is a simplified Manhattan-style path approach
             List<Vector2Int> path = new List<Vector2Int> { start };
             Vector2Int current = start;
-            
+
             // First try moving horizontally as much as possible
             while (current.x != end.x)
             {
                 Vector2Int next = current;
                 if (current.x < end.x) next.x++;
                 else next.x--;
-                
+
                 // Check if we can move to this tile
                 if (_gridService.IsValidPosition(next.x, next.y))
                 {
@@ -285,7 +299,7 @@ namespace DarkProtocol.Grid
                         // Try to go around vertically first
                         Vector2Int alternate = current;
                         alternate.y += (end.y > current.y) ? 1 : -1;
-                        
+
                         if (_gridService.IsValidPosition(alternate.x, alternate.y))
                         {
                             TileData altTile = _gridService.GridData.GetTileData(alternate);
@@ -296,26 +310,26 @@ namespace DarkProtocol.Grid
                                 continue;
                             }
                         }
-                        
+
                         // If we can't find any path, return null
-                        Debug.LogWarning($"Alternative pathfinding failed at position {current}");
+                        if (_enableDebugLogs) Debug.LogWarning($"Alternative pathfinding failed at position {current}");
                         return null;
                     }
                 }
                 else
                 {
-                    Debug.LogWarning($"Alternative pathfinding reached invalid position {next}");
+                    if (_enableDebugLogs) Debug.LogWarning($"Alternative pathfinding reached invalid position {next}");
                     return null;
                 }
             }
-            
+
             // Then move vertically to reach the target
             while (current.y != end.y)
             {
                 Vector2Int next = current;
                 if (current.y < end.y) next.y++;
                 else next.y--;
-                
+
                 // Check if we can move to this tile
                 if (_gridService.IsValidPosition(next.x, next.y))
                 {
@@ -327,57 +341,60 @@ namespace DarkProtocol.Grid
                     }
                     else
                     {
-                        Debug.LogWarning($"Alternative pathfinding blocked at position {next}");
+                        if (_enableDebugLogs) Debug.LogWarning($"Alternative pathfinding blocked at position {next}");
                         return null;
                     }
                 }
                 else
                 {
-                    Debug.LogWarning($"Alternative pathfinding reached invalid position {next}");
+                    if (_enableDebugLogs) Debug.LogWarning($"Alternative pathfinding reached invalid position {next}");
                     return null;
                 }
             }
-            
+
             return path;
         }
-        
+
         public void DebugPathfindingIssue(Vector2Int start, Vector2Int end)
         {
+            bool previousLogState = _enableDebugLogs;
+            _enableDebugLogs = true;
+
             Debug.Log($"Debugging pathfinding from {start} to {end}");
-            
+
             // Check if positions are valid
             bool startValid = _gridService.IsValidPosition(start.x, start.y);
             bool endValid = _gridService.IsValidPosition(end.x, end.y);
             Debug.Log($"Start position valid: {startValid}, End position valid: {endValid}");
-            
+
             // Check walkability
             bool startWalkable = false;
             bool endWalkable = false;
             bool startOccupied = false;
             bool endOccupied = false;
-            
+
             if (startValid)
             {
                 TileData startTile = _gridService.GridData.GetTileData(start);
                 startWalkable = startTile?.IsWalkable ?? false;
                 startOccupied = startTile?.IsOccupied ?? false;
             }
-            
+
             if (endValid)
             {
                 TileData endTile = _gridService.GridData.GetTileData(end);
                 endWalkable = endTile?.IsWalkable ?? false;
                 endOccupied = endTile?.IsOccupied ?? false;
             }
-            
+
             Debug.Log($"Start tile: Walkable={startWalkable}, Occupied={startOccupied}");
             Debug.Log($"End tile: Walkable={endWalkable}, Occupied={endOccupied}");
-            
+
             // If end is occupied, that could be the issue
             if (endOccupied)
             {
                 Debug.LogWarning("End position is occupied! This is likely why no path can be found.");
-                
+
                 // Check who is occupying it
                 var occupant = _gridService.GridData.GetOccupant(end.x, end.y);
                 if (occupant != null)
@@ -385,11 +402,11 @@ namespace DarkProtocol.Grid
                     Debug.LogWarning($"Tile is occupied by: {occupant.name}");
                 }
             }
-            
+
             // Try getting neighbors to see if they're walkable
             Debug.Log("Checking neighbors of start position:");
             CheckNeighbors(start);
-            
+
             Debug.Log("Checking manhattan path from start to end:");
             // Check the direct line of tiles between start and end
             Vector2Int current = start;
@@ -398,13 +415,13 @@ namespace DarkProtocol.Grid
                 // Move horizontally
                 if (current.x < end.x) current.x++;
                 else if (current.x > end.x) current.x--;
-                
+
                 // Check this position
                 if (_gridService.IsValidPosition(current.x, current.y))
                 {
                     TileData tile = _gridService.GridData.GetTileData(current);
                     Debug.Log($"Position {current}: Walkable={tile?.IsWalkable ?? false}, Occupied={tile?.IsOccupied ?? false}");
-                    
+
                     if (tile != null && tile.IsOccupied)
                     {
                         var occupant = _gridService.GridData.GetOccupant(current.x, current.y);
@@ -415,23 +432,23 @@ namespace DarkProtocol.Grid
                 {
                     Debug.Log($"Position {current}: Invalid position");
                 }
-                
+
                 // Break if we've reached the same X position
                 if (current.x == end.x) break;
             }
-            
+
             // Then move vertically
             while (current != end)
             {
                 if (current.y < end.y) current.y++;
                 else if (current.y > end.y) current.y--;
-                
+
                 // Check this position
                 if (_gridService.IsValidPosition(current.x, current.y))
                 {
                     TileData tile = _gridService.GridData.GetTileData(current);
                     Debug.Log($"Position {current}: Walkable={tile?.IsWalkable ?? false}, Occupied={tile?.IsOccupied ?? false}");
-                    
+
                     if (tile != null && tile.IsOccupied)
                     {
                         var occupant = _gridService.GridData.GetOccupant(current.x, current.y);
@@ -443,13 +460,16 @@ namespace DarkProtocol.Grid
                     Debug.Log($"Position {current}: Invalid position");
                 }
             }
-            
+
             // Suggest potential solutions
             Debug.Log("Potential solutions:");
             Debug.Log("1. Check if source and destination tiles are properly marked as walkable");
             Debug.Log("2. Make sure occupied tiles are correctly marked as occupied");
             Debug.Log("3. Verify that the grid data is properly initialized");
             Debug.Log("4. Check if tiles are marked as unwalkable when they should be walkable");
+
+            // Restore previous log state
+            _enableDebugLogs = previousLogState;
         }
 
         private void CheckNeighbors(Vector2Int position)
@@ -462,7 +482,7 @@ namespace DarkProtocol.Grid
                 new Vector2Int(0, 1),   // Up
                 new Vector2Int(0, -1),  // Down
             };
-            
+
             foreach (var dir in directions)
             {
                 Vector2Int neighbor = position + dir;
@@ -470,7 +490,7 @@ namespace DarkProtocol.Grid
                 {
                     TileData tile = _gridService.GridData.GetTileData(neighbor);
                     Debug.Log($"Neighbor {neighbor} ({GetDirectionName(dir)}): Walkable={tile?.IsWalkable ?? false}, Occupied={tile?.IsOccupied ?? false}");
-                    
+
                     if (tile != null && tile.IsOccupied)
                     {
                         var occupant = _gridService.GridData.GetOccupant(neighbor.x, neighbor.y);

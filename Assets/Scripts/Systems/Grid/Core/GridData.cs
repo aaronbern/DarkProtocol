@@ -748,7 +748,9 @@ namespace DarkProtocol.Grid
         Grass,
         Snow,
         Ice,
-        Lava
+        Lava,
+        Wall,
+        Obstacle
     }
     
     /// <summary>

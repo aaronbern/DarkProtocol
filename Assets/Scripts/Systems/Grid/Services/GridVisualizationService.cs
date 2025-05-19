@@ -72,6 +72,8 @@ namespace DarkProtocol.Grid
         /// <returns>List of positions in the movement range</returns>
         public List<Vector2Int> ShowMovementRange(Unit unit, int movementPoints)
         {
+            Debug.Log("USING GRID VISUALIZATION SERVICE");
+
             // Clear any existing range visualization
             ClearMovementRange();
             

@@ -43,6 +43,10 @@ namespace DarkProtocol.Units
 
         [Tooltip("Fade duration")]
         [SerializeField] private float fadeDuration = 0.2f;
+
+        [Header("Debug")]
+        [Tooltip("Enable debug logs")]
+        [SerializeField] private bool debugLogging = false;
         #endregion
 
         #region Private Variables
@@ -60,8 +64,32 @@ namespace DarkProtocol.Units
             // Cache renderers
             _renderers = GetComponentsInChildren<MeshRenderer>();
 
-            // Hide initially
-            SetVisible(false, false);
+            if (_renderers.Length == 0)
+            {
+                Debug.LogWarning($"[UnitHoverEffect] No MeshRenderers found in {gameObject.name}! The effect will be invisible.");
+
+                // Try to find any renderer type as a fallback
+                Renderer[] allRenderers = GetComponentsInChildren<Renderer>();
+                if (allRenderers.Length > 0)
+                {
+                    Debug.Log($"[UnitHoverEffect] Found {allRenderers.Length} non-mesh renderers instead.");
+                }
+            }
+            else
+            {
+                DebugLog($"Found {_renderers.Length} mesh renderers in {gameObject.name}");
+            }
+
+            // Ensure object is active before Awake completes
+            if (!gameObject.activeSelf)
+            {
+                DebugLog($"[CRITICAL] GameObject {gameObject.name} is inactive during Awake!");
+                gameObject.SetActive(true);
+            }
+
+            // Hide initially but keep GameObject active
+            SetAlpha(0f);
+            _isVisible = false;
         }
 
         /// <summary>
@@ -71,14 +99,20 @@ namespace DarkProtocol.Units
         {
             _targetUnit = unit;
 
+            DebugLog($"Initializing effect for unit: {(unit != null ? unit.name : "null")}");
+
+            // Ensure gameObject is active before proceeding
+            if (!gameObject.activeSelf)
+            {
+                DebugLog("[CRITICAL] GameObject is inactive during Initialize. Activating it.");
+                gameObject.SetActive(true);
+            }
+
             // Determine color based on team
             DetermineEffectColor();
 
             // Position correctly relative to the unit
             PositionEffect();
-
-            // Show the effect
-            Show();
         }
 
         private void Update()
@@ -128,11 +162,13 @@ namespace DarkProtocol.Units
                 Bounds bounds = unitRenderer.bounds;
                 Vector3 bottomCenter = new Vector3(0, -bounds.extents.y, 0);
                 transform.localPosition = bottomCenter;
+                DebugLog($"Positioned effect at y={bottomCenter.y} based on unit bounds");
             }
             else
             {
                 // Default position if no renderer found
                 transform.localPosition = new Vector3(0, 0.1f, 0);
+                DebugLog("No unit renderer found, using default position");
             }
         }
 
@@ -142,22 +178,31 @@ namespace DarkProtocol.Units
         public void DetermineEffectColor()
         {
             if (_targetUnit == null)
+            {
+                DebugLog("No target unit, using base color");
+                _effectColor = baseColor;
+                ApplyEffectColor(_effectColor);
                 return;
+            }
 
             // Set color based on team
             switch (_targetUnit.Team)
             {
                 case Unit.TeamType.Player:
                     _effectColor = playerColor;
+                    DebugLog($"Using player color for {_targetUnit.name}");
                     break;
                 case Unit.TeamType.Enemy:
                     _effectColor = enemyColor;
+                    DebugLog($"Using enemy color for {_targetUnit.name}");
                     break;
                 case Unit.TeamType.Neutral:
                     _effectColor = neutralColor;
+                    DebugLog($"Using neutral color for {_targetUnit.name}");
                     break;
                 default:
                     _effectColor = baseColor;
+                    DebugLog($"Using base color for {_targetUnit.name} (unknown team)");
                     break;
             }
 
@@ -170,8 +215,13 @@ namespace DarkProtocol.Units
         /// </summary>
         private void ApplyEffectColor(Color color)
         {
-            if (_renderers == null)
+            if (_renderers == null || _renderers.Length == 0)
+            {
+                DebugLog("Cannot apply color: No renderers available");
                 return;
+            }
+
+            DebugLog($"Applying color: {color} to {_renderers.Length} renderers");
 
             foreach (MeshRenderer renderer in _renderers)
             {
@@ -190,6 +240,14 @@ namespace DarkProtocol.Units
                         renderer.material.color = color;
                     }
                 }
+                else if (renderer == null)
+                {
+                    DebugLog("Null renderer found in array!");
+                }
+                else if (renderer.material == null)
+                {
+                    DebugLog($"Null material on renderer {renderer.name}!");
+                }
             }
         }
 
@@ -200,27 +258,54 @@ namespace DarkProtocol.Units
         {
             // Skip if already in the desired state
             if (_isVisible == visible)
+            {
+                DebugLog($"Already in desired visibility state: {visible}. Skipping.");
                 return;
+            }
+
+            DebugLog($"Setting visibility to {visible} with fade={fade}");
+
+            // Ensure gameObject is active for any visibility operations
+            if (!gameObject.activeSelf)
+            {
+                DebugLog("[CRITICAL] GameObject inactive when trying to change visibility! Activating it.");
+                gameObject.SetActive(true);
+            }
 
             _isVisible = visible;
 
             // Stop any active fade
             if (_fadeCoroutine != null)
             {
+                DebugLog("Stopping existing fade coroutine");
                 StopCoroutine(_fadeCoroutine);
                 _fadeCoroutine = null;
             }
 
             // Apply fade or immediate change
-            if (fade && fadeEffect)
+            if (fade && fadeEffect && gameObject.activeInHierarchy)
             {
-                _fadeCoroutine = StartCoroutine(FadeEffect(visible));
+                try
+                {
+                    DebugLog("Starting fade coroutine");
+                    _fadeCoroutine = StartCoroutine(FadeEffect(visible));
+                }
+                catch (System.Exception ex)
+                {
+                    // If coroutine fails, fall back to immediate change
+                    Debug.LogError($"[UnitHoverEffect] Error starting fade coroutine: {ex.Message}. Using immediate change instead.");
+                    SetAlpha(visible ? 1f : 0f);
+                }
             }
             else
             {
                 // Immediate change
+                DebugLog("Using immediate visibility change");
                 SetAlpha(visible ? 1f : 0f);
-                gameObject.SetActive(visible);
+
+                // IMPORTANT: Keep the GameObject active even when not visible
+                // Only change the alpha, not the active state
+                // This prevents the coroutine error
             }
         }
 
@@ -229,11 +314,10 @@ namespace DarkProtocol.Units
         /// </summary>
         private IEnumerator FadeEffect(bool fadeIn)
         {
-            // Ensure object is active for fade in
-            if (fadeIn)
-            {
-                gameObject.SetActive(true);
-            }
+            DebugLog($"FadeEffect started: fadeIn={fadeIn}");
+
+            // Ensure object stays active for the entire fade
+            gameObject.SetActive(true);
 
             float startAlpha = fadeIn ? 0f : 1f;
             float targetAlpha = fadeIn ? 1f : 0f;
@@ -257,13 +341,12 @@ namespace DarkProtocol.Units
             // Set final alpha
             SetAlpha(targetAlpha);
 
-            // Deactivate object if faded out
-            if (!fadeIn)
-            {
-                gameObject.SetActive(false);
-            }
+            // IMPORTANT: Keep the GameObject active even when not visible
+            // Only change the alpha, not the active state
+            // This prevents the coroutine error
 
             _fadeCoroutine = null;
+            DebugLog("FadeEffect completed");
         }
 
         /// <summary>
@@ -271,8 +354,13 @@ namespace DarkProtocol.Units
         /// </summary>
         private void SetAlpha(float alpha)
         {
-            if (_renderers == null)
+            if (_renderers == null || _renderers.Length == 0)
+            {
+                DebugLog("Cannot set alpha: No renderers available");
                 return;
+            }
+
+            DebugLog($"Setting alpha to {alpha} on {_renderers.Length} renderers");
 
             foreach (MeshRenderer renderer in _renderers)
             {
@@ -297,6 +385,15 @@ namespace DarkProtocol.Units
         /// </summary>
         public void Show()
         {
+            DebugLog("Show called");
+
+            // Ensure gameObject is active
+            if (!gameObject.activeSelf)
+            {
+                DebugLog("[CRITICAL] GameObject is inactive when Show was called! Activating it.");
+                gameObject.SetActive(true);
+            }
+
             SetVisible(true);
         }
 
@@ -305,6 +402,15 @@ namespace DarkProtocol.Units
         /// </summary>
         public void Hide()
         {
+            DebugLog("Hide called");
+
+            // Check if GameObject is active before trying to hide
+            if (!gameObject.activeSelf)
+            {
+                DebugLog("[CRITICAL] GameObject is already inactive when Hide was called!");
+                return;
+            }
+
             SetVisible(false);
         }
 
@@ -313,6 +419,7 @@ namespace DarkProtocol.Units
         /// </summary>
         public void UpdateColor(Color color)
         {
+            DebugLog($"UpdateColor called with {color}");
             _effectColor = color;
             ApplyEffectColor(color);
         }
@@ -323,6 +430,16 @@ namespace DarkProtocol.Units
         public void SetAnimationEnabled(bool enabled)
         {
             animate = enabled;
+        }
+        #endregion
+
+        #region Debug
+        private void DebugLog(string message)
+        {
+            if (debugLogging)
+            {
+                Debug.Log($"[UnitHoverEffect] {message}");
+            }
         }
         #endregion
     }

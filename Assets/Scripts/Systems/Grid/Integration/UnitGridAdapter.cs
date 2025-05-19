@@ -15,7 +15,7 @@ namespace DarkProtocol.Grid
         [SerializeField] private bool autoRegisterWithGrid = true;
         
         [Tooltip("Offset from the grid cell center when positioning the unit")]
-        [SerializeField] private Vector3 positionOffset = new Vector3(0, 0.5f, 0);
+        [SerializeField] private Vector3 positionOffset = new Vector3(0, 0.01f, 0);
         
         [Tooltip("Whether to snap movement to grid cells")]
         [SerializeField] private bool snapMovementToGrid = true;

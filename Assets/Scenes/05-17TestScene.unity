@@ -176,7 +176,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Button
+  m_text: Play Card
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -417,7 +417,7 @@ MonoBehaviour:
   movementRangeColor: {r: 0.2, g: 0.8, b: 0.4, a: 0.5}
   pathPreviewColor: {r: 1, g: 0.8, b: 0.2, a: 0.7}
   gridParent: {fileID: 0}
-  mainCamera: {fileID: 0}
+  mainCamera: {fileID: 1439904894}
   gridOverlaySystem: {fileID: 0}
   enableDebugView: 0
   showPathfindingResults: 1
@@ -469,7 +469,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -99}
+  m_AnchoredPosition: {x: 0, y: -10}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &605907419
@@ -516,20 +516,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 137a7277e0481284fb539d7e83f4e6af, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  movementRangeMaterial: {fileID: 2100000, guid: 3a42c36005014ae4c92916196c8423cf, type: 2}
+  gridLineMaterial: {fileID: 2100000, guid: 7e2ba0394f0a26c4cabc700eab920306, type: 2}
+  boundaryMaterial: {fileID: 2100000, guid: f8830fb9c7a48d04c98f0309bf41feda, type: 2}
+  obstructionMaterial: {fileID: 2100000, guid: e0592a966be3cd548922a7ac8bc00ae6, type: 2}
   pathPreviewMaterial: {fileID: 2100000, guid: e0592a966be3cd548922a7ac8bc00ae6, type: 2}
+  tileOutlineColor: {r: 1, g: 1, b: 1, a: 0.3}
   movementRangeColor: {r: 0.2, g: 0.8, b: 0.4, a: 0.5}
+  obstructionColor: {r: 1, g: 0, b: 0, a: 1}
   pathPreviewColor: {r: 1, g: 0.8, b: 0.2, a: 0.7}
   overlayHeight: 0.05
-  overlayScale: 0.9
-  enablePulseEffect: 1
-  pulseSpeed: 1.5
-  pulseIntensity: 0.2
-  enableEdgeHighlight: 1
-  edgeHighlightWidth: 0.05
-  renderLayer: 31
+  lineWidth: 0.05
+  boundaryLineWidth: 0.075
   createInteractionColliders: 1
   interactionColliderLayer: 10
+  useLegacyVisualization: 0
 --- !u!1 &730740314
 GameObject:
   m_ObjectHideFlags: 0
@@ -587,7 +587,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Button
+  m_text: Card
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -723,7 +723,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Button
+  m_text: Cancel Button
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -967,7 +967,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: -61}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &885367221
@@ -1444,7 +1444,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Button
+  m_text: Hide Card Button
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -1539,6 +1539,10 @@ PrefabInstance:
       propertyPath: unitName
       value: Enemy1
       objectReference: {fileID: 0}
+    - target: {fileID: 5873977991407409587, guid: a656babb779e52b448db25e3919db093, type: 3}
+      propertyPath: positionOffset.y
+      value: 0.01
+      objectReference: {fileID: 0}
     - target: {fileID: 9104944229301615583, guid: a656babb779e52b448db25e3919db093, type: 3}
       propertyPath: m_Name
       value: Enemy 1
@@ -1549,7 +1553,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 9104944229301643199, guid: a656babb779e52b448db25e3919db093, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.5
+      value: 0.01
       objectReference: {fileID: 0}
     - target: {fileID: 9104944229301643199, guid: a656babb779e52b448db25e3919db093, type: 3}
       propertyPath: m_LocalPosition.z
@@ -2042,6 +2046,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1820969375}
     m_Modifications:
+    - target: {fileID: 5873977991407409587, guid: a656babb779e52b448db25e3919db093, type: 3}
+      propertyPath: positionOffset.y
+      value: 0.01
+      objectReference: {fileID: 0}
     - target: {fileID: 9104944229301615583, guid: a656babb779e52b448db25e3919db093, type: 3}
       propertyPath: m_Name
       value: Soldier 1
@@ -2052,7 +2060,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 9104944229301643199, guid: a656babb779e52b448db25e3919db093, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: 0.01
       objectReference: {fileID: 0}
     - target: {fileID: 9104944229301643199, guid: a656babb779e52b448db25e3919db093, type: 3}
       propertyPath: m_LocalPosition.z
@@ -2257,6 +2265,10 @@ PrefabInstance:
       propertyPath: unitName
       value: Soldier 2
       objectReference: {fileID: 0}
+    - target: {fileID: 5873977991407409587, guid: a656babb779e52b448db25e3919db093, type: 3}
+      propertyPath: positionOffset.y
+      value: 0.01
+      objectReference: {fileID: 0}
     - target: {fileID: 9104944229301615583, guid: a656babb779e52b448db25e3919db093, type: 3}
       propertyPath: m_Name
       value: Soldier 2
@@ -2267,7 +2279,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 9104944229301643199, guid: a656babb779e52b448db25e3919db093, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: 0.01
       objectReference: {fileID: 0}
     - target: {fileID: 9104944229301643199, guid: a656babb779e52b448db25e3919db093, type: 3}
       propertyPath: m_LocalPosition.z
@@ -2359,7 +2371,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bbe2eb999ff33b14f89bd5cccf2cb4c9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  mapBounds: {fileID: 0}
+  mapBounds: {fileID: 1439904895}
   moveSpeed: 20
   moveAcceleration: 8
   moveDeceleration: 12
@@ -2368,16 +2380,16 @@ MonoBehaviour:
   zoomSpeed: 50
   zoomAcceleration: 15
   minZoomDistance: 5
-  maxZoomDistance: 9
-  groundHeight: 5
+  maxZoomDistance: 15
+  groundHeight: 0
   zoomAlongForwardAxis: 1
   minPitchAngle: 30
-  maxPitchAngle: 65
+  maxPitchAngle: 55
   rotationSpeed: 90
   rotationAcceleration: 15
   rotationDeceleration: 20
   rotateAroundFocusPoint: 1
-  focusDistance: 10
+  focusDistance: 13
   showDebugInfo: 0
 --- !u!114 &1439904892
 MonoBehaviour:
@@ -2402,8 +2414,8 @@ MonoBehaviour:
     m_Bits: 1
   m_VolumeTrigger: {fileID: 0}
   m_VolumeFrameworkUpdateModeOption: 2
-  m_RenderPostProcessing: 0
-  m_Antialiasing: 0
+  m_RenderPostProcessing: 1
+  m_Antialiasing: 1
   m_AntialiasingQuality: 2
   m_StopNaN: 0
   m_Dithering: 0
@@ -2535,7 +2547,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 59
   autoSelectSingleUnit: 1
-  tabActionReference: {fileID: 0}
+  tabActionReference: {fileID: -4325279744780787688, guid: 215bb6e7c0bfe6644b8ba7cd2d162dc1, type: 3}
   showDebugInfo: 1
   OnUnitSelected:
     m_PersistentCalls:
@@ -2591,7 +2603,7 @@ MonoBehaviour:
   unitLayerMask:
     serializedVersion: 2
     m_Bits: 59
-  maxRaycastDistance: 100
+  maxRaycastDistance: 500
   updateFrequency: 0.05
   defaultHoverEffectPrefab: {fileID: 8883093286843099783, guid: 37cfb955acbd52a48bea04c3361890f8, type: 3}
   playerUnitEffectPrefab: {fileID: 3402965455714930581, guid: baeeb0f5f807af04aaca78ea1408174b, type: 3}
@@ -2600,7 +2612,8 @@ MonoBehaviour:
   validTargetColor: {r: 0.2, g: 1, b: 0.2, a: 0.8}
   invalidTargetColor: {r: 1, g: 0.2, b: 0.2, a: 0.8}
   targetPulseIntensity: 0.3
-  enableDebugLogs: 0
+  enableDebugLogs: 1
+  suppressGroundHitLogs: 0
 --- !u!4 &1574761236
 Transform:
   m_ObjectHideFlags: 0
@@ -2790,7 +2803,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Button
+  m_text: End Turn
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -2940,7 +2953,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -109}
+  m_AnchoredPosition: {x: -297, y: -80}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1850638167
@@ -3089,7 +3102,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -253, y: 0}
+  m_AnchoredPosition: {x: -6, y: 60}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1915842548
@@ -3187,7 +3200,7 @@ GameObject:
   - component: {fileID: 2019527897}
   - component: {fileID: 2019527896}
   - component: {fileID: 2019527895}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Ground
   m_TagString: Untagged
   m_Icon: {fileID: 0}
