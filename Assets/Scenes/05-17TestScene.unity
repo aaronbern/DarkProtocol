@@ -180,7 +180,8 @@ MonoBehaviour:
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_fontSharedMaterials: []
+  m_fontSharedMaterials:
+  - {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
   m_fontColor32:
@@ -517,14 +518,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   gridLineMaterial: {fileID: 2100000, guid: 7e2ba0394f0a26c4cabc700eab920306, type: 2}
-  boundaryMaterial: {fileID: 2100000, guid: f8830fb9c7a48d04c98f0309bf41feda, type: 2}
+  boundaryMaterial: {fileID: 2100000, guid: 3a42c36005014ae4c92916196c8423cf, type: 2}
   obstructionMaterial: {fileID: 2100000, guid: e0592a966be3cd548922a7ac8bc00ae6, type: 2}
   pathPreviewMaterial: {fileID: 2100000, guid: e0592a966be3cd548922a7ac8bc00ae6, type: 2}
   tileOutlineColor: {r: 1, g: 1, b: 1, a: 0.3}
-  movementRangeColor: {r: 0.2, g: 0.8, b: 0.4, a: 0.5}
+  movementRangeColor: {r: 0.2, g: 1, b: 0.39607844, a: 0.5}
   obstructionColor: {r: 1, g: 0, b: 0, a: 1}
   pathPreviewColor: {r: 1, g: 0.8, b: 0.2, a: 0.7}
-  overlayHeight: 0.05
+  overlayHeight: 0.1
   lineWidth: 0.05
   boundaryLineWidth: 0.075
   createInteractionColliders: 1
@@ -591,7 +592,8 @@ MonoBehaviour:
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_fontSharedMaterials: []
+  m_fontSharedMaterials:
+  - {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
   m_fontColor32:
@@ -727,7 +729,8 @@ MonoBehaviour:
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_fontSharedMaterials: []
+  m_fontSharedMaterials:
+  - {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
   m_fontColor32:
@@ -1448,7 +1451,8 @@ MonoBehaviour:
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_fontSharedMaterials: []
+  m_fontSharedMaterials:
+  - {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
   m_fontColor32:
@@ -1963,7 +1967,8 @@ MonoBehaviour:
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_fontSharedMaterials: []
+  m_fontSharedMaterials:
+  - {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
   m_fontColor32:
@@ -2377,19 +2382,19 @@ MonoBehaviour:
   moveDeceleration: 12
   keyboardSensitivity: 1
   fastMoveFactor: 2.5
-  zoomSpeed: 50
+  zoomSpeed: 60
   zoomAcceleration: 15
-  minZoomDistance: 5
+  minZoomDistance: 3
   maxZoomDistance: 15
   groundHeight: 0
   zoomAlongForwardAxis: 1
   minPitchAngle: 30
-  maxPitchAngle: 55
+  maxPitchAngle: 60
   rotationSpeed: 90
   rotationAcceleration: 15
   rotationDeceleration: 20
   rotateAroundFocusPoint: 1
-  focusDistance: 13
+  focusDistance: 12
   showDebugInfo: 0
 --- !u!114 &1439904892
 MonoBehaviour:
@@ -2415,7 +2420,7 @@ MonoBehaviour:
   m_VolumeTrigger: {fileID: 0}
   m_VolumeFrameworkUpdateModeOption: 2
   m_RenderPostProcessing: 1
-  m_Antialiasing: 1
+  m_Antialiasing: 3
   m_AntialiasingQuality: 2
   m_StopNaN: 0
   m_Dithering: 0
@@ -2807,7 +2812,8 @@ MonoBehaviour:
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_fontSharedMaterials: []
+  m_fontSharedMaterials:
+  - {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
   m_fontColor32:

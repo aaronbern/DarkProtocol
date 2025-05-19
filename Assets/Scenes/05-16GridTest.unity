@@ -625,20 +625,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 137a7277e0481284fb539d7e83f4e6af, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  movementRangeMaterial: {fileID: 2100000, guid: 3a42c36005014ae4c92916196c8423cf, type: 2}
+  gridLineMaterial: {fileID: 0}
+  boundaryMaterial: {fileID: 0}
+  obstructionMaterial: {fileID: 0}
   pathPreviewMaterial: {fileID: 2100000, guid: e0592a966be3cd548922a7ac8bc00ae6, type: 2}
+  tileOutlineColor: {r: 1, g: 1, b: 1, a: 0.3}
   movementRangeColor: {r: 0.2, g: 0.8, b: 0.4, a: 0.5}
+  obstructionColor: {r: 1, g: 0, b: 0, a: 1}
   pathPreviewColor: {r: 1, g: 0.8, b: 0.2, a: 0.7}
   overlayHeight: 0.05
-  overlayScale: 0.9
-  enablePulseEffect: 1
-  pulseSpeed: 1.5
-  pulseIntensity: 0.2
-  enableEdgeHighlight: 1
-  edgeHighlightWidth: 0.05
-  renderLayer: 31
+  lineWidth: 0.03
+  boundaryLineWidth: 0.05
   createInteractionColliders: 1
   interactionColliderLayer: 10
+  useLegacyVisualization: 0
 --- !u!114 &1315545786
 MonoBehaviour:
   m_ObjectHideFlags: 0
