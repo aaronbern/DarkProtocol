@@ -1811,6 +1811,93 @@ Transform:
   - {fileID: 2019527894}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1229330591
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1229330595}
+  - component: {fileID: 1229330594}
+  - component: {fileID: 1229330593}
+  - component: {fileID: 1229330592}
+  m_Layer: 0
+  m_Name: EffectGenerator
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1229330592
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1229330591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 071352494f533c148a4e2e9cca4059b9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  playerEffectGenerator: {fileID: 1229330594}
+  enemyEffectGenerator: {fileID: 1229330593}
+  prefabFolderPath: Assets/Prefabs
+  playerPrefabName: PlayerUnitEffect
+  enemyPrefabName: EnemyUnitEffect
+--- !u!114 &1229330593
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1229330591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d7a0fa31fd3f34d4d90820acccd754cb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  effectRadius: 0.65
+  ringThickness: 0.06
+  effectHeight: 0.02
+  enemyColor: {r: 1, g: 0.3, b: 0.3, a: 0.7}
+  pulseIntensity: 0.15
+  animationSpeed: 1.2
+--- !u!114 &1229330594
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1229330591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10f55cc8b4e8f354ba13bf4aec98aece, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ringRadius: 0.6
+  ringThickness: 0.08
+  ringHeight: 0.02
+  playerColor: {r: 0.2, g: 0.6, b: 1, a: 0.7}
+  pulseIntensity: 0.2
+  animationSpeed: 1.5
+--- !u!4 &1229330595
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1229330591}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 5.25695, y: 0.15, z: 2.10986}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1278964197
 GameObject:
   m_ObjectHideFlags: 0
@@ -2467,6 +2554,63 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 13.04925, y: 0, z: 1.27778}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1574761234
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1574761236}
+  - component: {fileID: 1574761235}
+  m_Layer: 0
+  m_Name: UnitHoverFeedback
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1574761235
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1574761234}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c98e4ff9c1b91a4fb1ad9490aa0fdb5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  unitLayerMask:
+    serializedVersion: 2
+    m_Bits: 59
+  maxRaycastDistance: 100
+  updateFrequency: 0.05
+  defaultHoverEffectPrefab: {fileID: 8883093286843099783, guid: 37cfb955acbd52a48bea04c3361890f8, type: 3}
+  playerUnitEffectPrefab: {fileID: 3402965455714930581, guid: baeeb0f5f807af04aaca78ea1408174b, type: 3}
+  enemyUnitEffectPrefab: {fileID: 6795757318508437264, guid: 984eb07db834c544f9f5f04bfb1c2f97, type: 3}
+  onlyShowForInteractableUnits: 1
+  validTargetColor: {r: 0.2, g: 1, b: 0.2, a: 0.8}
+  invalidTargetColor: {r: 1, g: 0.2, b: 0.2, a: 0.8}
+  targetPulseIntensity: 0.3
+  enableDebugLogs: 0
+--- !u!4 &1574761236
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1574761234}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 5.25695, y: 0.15, z: 2.10986}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3175,3 +3319,5 @@ SceneRoots:
   - {fileID: 1025458405}
   - {fileID: 1337075085}
   - {fileID: 885367223}
+  - {fileID: 1574761236}
+  - {fileID: 1229330595}
