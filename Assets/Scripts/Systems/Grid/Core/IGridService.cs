@@ -144,6 +144,7 @@ namespace DarkProtocol.Grid
         /// <param name="unit">The unit to register</param>
         void RegisterUnitAtPosition(Unit unit);
 
+        
         /// <summary>
         /// Get the grid position of a unit
         /// </summary>
@@ -171,6 +172,9 @@ namespace DarkProtocol.Grid
         /// </summary>
         /// <returns>List of positions in the movement range</returns>
         List<Vector2Int> GetCurrentMovementRange();
+
+        
+        void SetActiveUnit(Unit unit);
     }
 
     /// <summary>

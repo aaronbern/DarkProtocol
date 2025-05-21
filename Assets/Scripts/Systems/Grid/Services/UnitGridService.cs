@@ -14,7 +14,9 @@ namespace DarkProtocol.Grid
         
         // Currently selected unit
         private Unit _selectedUnit;
-        
+
+        private Unit _activeUnit;
+
         // Current movement range
         private List<Vector2Int> _currentMovementRange = new List<Vector2Int>();
 
@@ -56,7 +58,32 @@ namespace DarkProtocol.Grid
                     Debug.Log($"Unit {GetUnitDisplayName(unit)} registered at grid position ({pos.x}, {pos.y})");
             }
         }
-        
+
+        /// <summary>
+        /// Set the active unit for the current turn
+        /// </summary>
+        /// <param name="unit">The unit to set as active</param>
+        public void SetActiveUnit(Unit unit)
+        {
+            _activeUnit = unit;
+
+            // Clear previous visualizations
+            if (_visualizationService != null)
+            {
+                _visualizationService.ClearMovementRange();
+                _visualizationService.ClearPathVisualization();
+            }
+
+            _currentMovementRange.Clear();
+
+            // Show movement range for the new active unit
+            if (unit != null && _visualizationService != null)
+            {
+                Debug.Log($"Showing movement range for active unit {GetUnitDisplayName(unit)}");
+                _currentMovementRange = _visualizationService.ShowMovementRange(unit, unit.CurrentMovementPoints);
+            }
+        }
+
         /// <summary>
         /// Get the grid position of a unit
         /// </summary>
@@ -66,19 +93,19 @@ namespace DarkProtocol.Grid
         public bool GetUnitGridPosition(Unit unit, out Vector2Int position)
         {
             position = Vector2Int.zero;
-            
+
             if (unit == null || _gridService == null)
                 return false;
-                
+
             // Get unit world position
             Vector3 worldPos = unit.transform.position;
-            
+
             // Convert to grid position
             if (_gridService.WorldToGridPosition(worldPos, out position))
             {
                 return true;
             }
-            
+
             return false;
         }
         
@@ -200,29 +227,19 @@ namespace DarkProtocol.Grid
             _currentMovementRange.Clear();
             _selectedUnit = unit;
 
-            // Check if this is the active unit in the current turn
-            bool isActiveUnit = false;
-            if (GameManager.Instance != null)
-            {
-                isActiveUnit = (GameManager.Instance.ActiveUnit == unit);
-            }
-
-            // Only show movement range for the active unit
-            if (unit != null && isActiveUnit && _visualizationService != null)
+            // Check if this is the active unit
+            if (unit != null && unit == _activeUnit && _visualizationService != null)
             {
                 Debug.Log($"Showing movement range for active unit {GetUnitDisplayName(unit)}");
                 _currentMovementRange = _visualizationService.ShowMovementRange(unit, unit.CurrentMovementPoints);
             }
-            else if (unit != null && !isActiveUnit)
+            else if (unit != null && unit != _activeUnit)
             {
                 // This unit is not the active unit - display a message
                 Debug.LogWarning($"Cannot show movement for {GetUnitDisplayName(unit)} - not the active unit");
-
-                // Here you could trigger a UI message saying "Must finish current unit's turn first"
-                // For example:
-                // UIManager.Instance.ShowMessage("Must finish current unit's turn first");
             }
         }
+        
         public List<Vector2Int> GetCurrentMovementRange()
         {
             return new List<Vector2Int>(_currentMovementRange);

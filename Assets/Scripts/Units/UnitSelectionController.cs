@@ -348,7 +348,7 @@ public class UnitSelectionController : MonoBehaviour
         if (showDebugInfo)
             Debug.Log($"Available units: {_availableUnits.Count}");
     }
-    
+
     /// <summary>
     /// Selects a unit for the current player turn
     /// </summary>
@@ -360,55 +360,52 @@ public class UnitSelectionController : MonoBehaviour
             Debug.LogWarning("Invalid unit selection!");
             return;
         }
-        
+
         // Make sure the unit hasn't already acted this round
         if (_unitsActedThisRound.Contains(unit))
         {
             Debug.LogWarning($"{unit.UnitName} has already acted this round!");
             return;
         }
-        
+
         // Make sure selection is enabled
         if (!_selectionEnabled)
         {
             Debug.LogWarning("Unit selection is currently disabled!");
             return;
         }
-        
+
         // If there's currently a selected unit, make sure to discard its hand first
         if (CurrentlySelectedUnit != null && _cardSystem != null)
         {
             _cardSystem.DiscardHand(CurrentlySelectedUnit);
         }
-        
+
         // Use the Unit's static selection method
         Unit.SelectUnit(unit);
-        
-        // Disable further selection until this unit's turn is complete
-        _selectionEnabled = false;
-        
-        // Start the unit's turn
-        unit.StartTurn();
-        
-        // Draw cards for this unit
-        if (_cardSystem != null)
-        {
-            _cardSystem.DrawHandForUnit(unit);
-        }
-        
+
         // Notify any listeners
         OnUnitSelected?.Invoke(unit);
-        
+
         // Also notify the grid manager
         if (GridManager.Instance != null)
         {
             GridManager.Instance.OnUnitSelected(unit);
         }
-        
+
         if (showDebugInfo)
             Debug.Log($"Selected {unit.UnitName} for this turn.");
+
+        // REMOVED: Start the unit's turn
+        // unit.StartTurn();
+
+        // REMOVED: Draw cards for this unit
+        // if (_cardSystem != null)
+        // {
+        //     _cardSystem.DrawHandForUnit(unit);
+        // }
     }
-    
+
     /// <summary>
     /// Helper method for debug/testing - cycles to the next available unit
     /// </summary>
@@ -436,60 +433,42 @@ public class UnitSelectionController : MonoBehaviour
         if (showDebugInfo)
             Debug.Log($"HandleUnitClicked called for {clickedUnit?.UnitName ?? "null"}");
 
-        // Only allow selecting the active unit during a turn
-        if (GameManager.Instance != null && GameManager.Instance.IsPlayerTurn())
+        // Validate that the unit can be selected
+        if (!_selectionEnabled)
         {
-            Unit activeUnit = GameManager.Instance.ActiveUnit;
-
-            // If there's an active unit and it's not the one clicked
-            if (activeUnit != null && clickedUnit != activeUnit)
-            {
-                Debug.LogWarning($"Cannot select {clickedUnit?.UnitName} - must finish {activeUnit.UnitName}'s turn first");
-
-                // Here you could show a UI message
-                // UIManager.Instance.ShowMessage($"Must finish {activeUnit.UnitName}'s turn first");
-
-                return;
-            }
+            Debug.Log("Selection is disabled - unit is currently active or it's not player turn");
+            return;
         }
 
-        // Continue with normal selection logic if the clicked unit is the active one
-        // or if we're in the unit selection phase
-        if (_selectionEnabled)
+        // Verify the unit is valid and available
+        if (clickedUnit != null && clickedUnit.Team == Unit.TeamType.Player &&
+            clickedUnit.IsAlive && !_unitsActedThisRound.Contains(clickedUnit))
         {
-            // Verify the unit is valid and available
-            if (clickedUnit != null && clickedUnit.Team == Unit.TeamType.Player &&
-                clickedUnit.IsAlive && !_unitsActedThisRound.Contains(clickedUnit))
-            {
-                if (showDebugInfo)
-                    Debug.Log($"Unit {clickedUnit.UnitName} is valid for selection");
+            if (showDebugInfo)
+                Debug.Log($"Unit {clickedUnit.UnitName} is valid for selection");
 
-                SelectUnit(clickedUnit);
-            }
-            else
-            {
-                // Debug why the unit can't be selected
-                if (clickedUnit == null)
-                {
-                    Debug.Log("Clicked unit is null");
-                }
-                else if (clickedUnit.Team != Unit.TeamType.Player)
-                {
-                    Debug.Log($"Unit {clickedUnit.UnitName} is not on Player team");
-                }
-                else if (!clickedUnit.IsAlive)
-                {
-                    Debug.Log($"Unit {clickedUnit.UnitName} is not alive");
-                }
-                else if (_unitsActedThisRound.Contains(clickedUnit))
-                {
-                    Debug.Log($"Unit {clickedUnit.UnitName} has already acted this round");
-                }
-            }
+            // Select the unit via the Unit system
+            SelectUnit(clickedUnit);
         }
         else
         {
-            Debug.Log("Selection is disabled - unit is currently active or it's not player turn");
+            // Debug why the unit can't be selected
+            if (clickedUnit == null)
+            {
+                Debug.Log("Clicked unit is null");
+            }
+            else if (clickedUnit.Team != Unit.TeamType.Player)
+            {
+                Debug.Log($"Unit {clickedUnit.UnitName} is not on Player team");
+            }
+            else if (!clickedUnit.IsAlive)
+            {
+                Debug.Log($"Unit {clickedUnit.UnitName} is not alive");
+            }
+            else if (_unitsActedThisRound.Contains(clickedUnit))
+            {
+                Debug.Log($"Unit {clickedUnit.UnitName} has already acted this round");
+            }
         }
     }
 

@@ -121,7 +121,11 @@ public class UnitInputHandler : MonoBehaviour
                 if (UnitSelectionController.Instance != null)
                 {
                     UnitSelectionController.Instance.HandleUnitClicked(clickedUnit);
-                    
+                    if (GameManager.Instance != null && GameManager.Instance.IsPlayerTurn())
+                    {
+                        GameManager.Instance.StartUnitTurn(clickedUnit);
+                    }
+
                     // ADDED: Also notify GridManager directly
                     if (DarkProtocol.Grid.GridManager.Instance != null)
                     {

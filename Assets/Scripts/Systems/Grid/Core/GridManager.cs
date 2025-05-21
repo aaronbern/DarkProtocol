@@ -320,7 +320,14 @@ namespace DarkProtocol.Grid
         {
             return _gridService?.GridToWorldPosition(gridPosition) ?? Vector3.zero;
         }
-        
+
+  
+        public void SetActiveUnit(Unit unit)
+        {
+            // No need to store locally, just forward to UnitGridService
+            _unitGridService?.SetActiveUnit(unit);
+        }
+
         /// <summary>
         /// Convert world position to grid coordinates
         /// </summary>
@@ -330,7 +337,7 @@ namespace DarkProtocol.Grid
             {
                 return _gridService.WorldToGridPosition(worldPosition, out x, out z);
             }
-            
+
             x = 0;
             z = 0;
             return false;

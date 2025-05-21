@@ -446,21 +446,22 @@ namespace DarkProtocol.Cards
                     break;
             }
         }
-        
+
         /// <summary>
         /// Handle unit activation
         /// </summary>
         private void HandleUnitActivated(Unit unit)
         {
             if (unit == null) return;
-            
-            // Draw a hand for the activated unit
-            DrawHandForUnit(unit);
-            
+
+            // CHANGED: Comment out automatic card drawing
+            // DrawHandForUnit(unit);  <-- Remove or comment out this line
+
             // Store as active unit
             _activeUnit = unit;
+
+            DebugLog($"Unit {unit.UnitName} activated - cards will be drawn when requested");
         }
-        
         /// <summary>
         /// Handle unit deactivation
         /// </summary>

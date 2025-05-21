@@ -104,10 +104,10 @@ namespace DarkProtocol.UI
             // Get input references
             _mouse = Mouse.current;
             _keyboard = Keyboard.current;
-            
+
             // Get card system reference
             _cardSystem = CardSystem.Instance;
-            
+
             if (_cardSystem == null)
             {
                 Debug.LogError("No CardSystem found in scene! Make sure it exists.");
@@ -120,7 +120,7 @@ namespace DarkProtocol.UI
                 _cardSystem.OnCardPlayed += HandleCardPlayed;
                 _cardSystem.OnCardDiscarded += HandleCardDiscarded;
             }
-            
+
             // Set up cancel button
             if (cancelButton != null)
             {
@@ -134,13 +134,13 @@ namespace DarkProtocol.UI
                 playCardButton.onClick.AddListener(() => PlaySelectedCard(null));
                 playCardButton.gameObject.SetActive(false);
             }
-            
+
             // Set up toggle cards button
             if (toggleCardsButton != null)
             {
                 toggleCardsButton.onClick.AddListener(ToggleCardHandVisibility);
             }
-            
+
             // Hide card info panel by default
             if (cardInfoPanel != null)
             {
@@ -153,10 +153,10 @@ namespace DarkProtocol.UI
                 _handOriginalPosition = cardsPanel.anchoredPosition;
             }
 
-            // Initialize visibility
-            _isCardHandVisible = cardHandVisible;
+            // Initialize visibility - CHANGED from cardHandVisible to false
+            _isCardHandVisible = false;
             UpdateCardHandVisibility(false); // No animation at start
-            
+
             // Add audio source if needed
             if (audioSource == null)
             {
@@ -164,18 +164,7 @@ namespace DarkProtocol.UI
                 audioSource.playOnAwake = false;
             }
         }
-        
-        private void Start()
-        {
-            // Subscribe to GameManager events
-            if (GameManager.Instance != null)
-            {
-                GameManager.Instance.OnTurnChanged += HandleTurnChanged;
-                GameManager.Instance.OnUnitActivated += HandleUnitActivated;
-                GameManager.Instance.OnUnitDeactivated += HandleUnitDeactivated;
-            }
-        }
-        
+
         private void OnDestroy()
         {
             // Unsubscribe from card system events
@@ -846,19 +835,32 @@ namespace DarkProtocol.UI
         /// </summary>
         public void ToggleCardHandVisibility()
         {
+            // ADDED: If we're showing cards for the first time, draw them
+            if (!_isCardHandVisible && GameManager.Instance != null && GameManager.Instance.ActiveUnit != null)
+            {
+                // Check if this unit already has cards
+                Unit activeUnit = GameManager.Instance.ActiveUnit;
+                if (_cardSystem != null && _cardSystem.GetHandForUnit(activeUnit).Count == 0)
+                {
+                    // Draw cards for the unit if none exist yet
+                    _cardSystem.DrawHandForUnit(activeUnit);
+                    DebugLog("Drawing cards on first reveal");
+                }
+            }
+
             // Toggle state
             _isCardHandVisible = !_isCardHandVisible;
-            
+
             // Update visibility with animation
             UpdateCardHandVisibility(true);
-            
+
             // Play toggle sound
             if (audioSource != null && toggleSound != null)
             {
                 audioSource.PlayOneShot(toggleSound);
             }
         }
-        
+
         /// <summary>
         /// Update the card hand visibility based on current state
         /// </summary>
@@ -1096,15 +1098,13 @@ namespace DarkProtocol.UI
         /// </summary>
         private void HandleUnitActivated(Unit unit)
         {
-            // If a new unit is activated, make sure card panel is visible
+            // CHANGED: Don't automatically make card hand visible
             if (unit != null && unit.Team == Unit.TeamType.Player)
             {
-                // Make sure card hand is visible
-                if (!_isCardHandVisible)
-                {
-                    _isCardHandVisible = true;
-                    UpdateCardHandVisibility(true);
-                }
+                // Make sure card hand is HIDDEN initially
+                _isCardHandVisible = false;
+                UpdateCardHandVisibility(true);
+                DebugLog($"Unit {unit.UnitName} activated - cards hidden initially");
             }
         }
 

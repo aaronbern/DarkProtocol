@@ -165,11 +165,14 @@ public class Unit : MonoBehaviour
     public bool HasActionPoints => currentActionPoints > 0;
     public bool HasMovementPoints => currentMovementPoints > 0;
     public bool IsSelected => isSelected;
-    
+
+    // Add this property to Unit.cs in the Stats Properties region
+    public bool HasStartedTurn { get; private set; } = false;
+
     #endregion
 
     #region Events
-    
+
     // Events for other systems to subscribe to
     public event Action<int, int> OnHealthChanged; // (newHealth, oldHealth)
     public event Action<int, int> OnActionPointsChanged; // (newAP, oldAP)
@@ -265,7 +268,7 @@ public class Unit : MonoBehaviour
             AutoSelectUnitForCurrentTurn();
         }
     }
-    
+
     /// <summary>
     /// Prepares the unit for a new turn
     /// </summary>
@@ -276,34 +279,38 @@ public class Unit : MonoBehaviour
             Debug.LogWarning($"{unitName} cannot start a turn because they are not alive.");
             return;
         }
-        
+
         // Reset points for the new turn
         ResetActionPoints();
         ResetMovementPoints();
-        
+
+        // Set the flag that this unit has started its turn
+        HasStartedTurn = true;
+
         // Notify subscribers that the turn has started
         OnTurnStarted?.Invoke();
-        
+
         Debug.Log($"{unitName} ({team}) is starting their turn with {currentActionPoints} AP and {currentMovementPoints} movement.");
     }
-    
+
     /// <summary>
     /// Ends this unit's turn
     /// </summary>
     public virtual void EndTurn()
     {
-        // Could include end-of-turn effects here
-        
+        // Reset the turn flag
+        HasStartedTurn = false;
+
         // Notify subscribers that the turn has ended
         OnTurnEnded?.Invoke();
-        
+
         Debug.Log($"{unitName} ({team}) has ended their turn.");
     }
-    
+
     #endregion
 
     #region Selection Management
-    
+
     /// <summary>
     /// Called when this unit is selected
     /// </summary>
