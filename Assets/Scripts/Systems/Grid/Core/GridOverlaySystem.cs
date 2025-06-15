@@ -928,7 +928,7 @@ namespace DarkProtocol.Grid
             // Debug info to help troubleshooting
             if (_tileOutlineMesh == null || _boundaryMesh == null || _obstructionMesh == null)
             {
-                Debug.LogWarning($"[GridOverlaySystem] Missing meshes: TileOutline={_tileOutlineMesh != null}, Boundary={_boundaryMesh != null}, Obstruction={_obstructionMesh != null}");
+                ///Debug.LogWarning($"[GridOverlaySystem] Missing meshes: TileOutline={_tileOutlineMesh != null}, Boundary={_boundaryMesh != null}, Obstruction={_obstructionMesh != null}");
             }
 
             // Ensure materials are initialized

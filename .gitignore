@@ -1,9 +1,34 @@
+# Unity auto-generated folders
 [Ll]ibrary/
 [Tt]emp/
 [Oo]bj/
 [Bb]uild/
 [Uu]serSettings/
+MemoryCaptures/
+Logs/
+
+# IDE/Editor files
 *.csproj
 *.sln
-Logs/
-.zip
+*.user
+*.vs
+
+# Unity asset system
+*.meta
+*.brush
+*.pidb
+*.booproj
+*.svd
+*.unityproj
+
+# Archives
+*.zip
+
+# System
+.DS_Store
+Thumbs.db
+
+# Optional: Heavy or third-party assets you don’t want to track
+Assets/ALP_Assets/
+Assets/HDRPDefaultResources/
+Assets/TerrainSampleAssets/

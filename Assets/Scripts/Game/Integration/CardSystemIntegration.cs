@@ -1,293 +1,399 @@
-using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using DarkProtocol.Cards;
+using DarkProtocol.UI;
 
-/// <summary>
-/// Utility class to integrate the card system with the GameManager
-/// </summary>
-public class CardSystemIntegration : MonoBehaviour
+namespace DarkProtocol.Integration
 {
-    #region Inspector Fields
-    [Header("References")]
-    [SerializeField] private GameObject cardHandUIObject;
-    [SerializeField] private Transform cardContainer;
-    
-    [Header("Prefabs")]
-    [SerializeField] private GameObject cardPrefab;
-    
-    [Header("Animation")]
-    [SerializeField] private float cardDrawDelay = 0.2f;
-    [SerializeField] private AnimationCurve cardDrawCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
-    
-    [Header("Debug")]
-    [SerializeField] private bool showDebugInfo = true;
-    #endregion
-
-    #region Private Fields
-    // References to systems
-    private CardSystem _cardSystem;
-    private GameManager _gameManager;
-    #endregion
-
-    #region Unity Lifecycle
-    private void Awake()
-    {
-        // Find systems
-        _cardSystem = FindFirstObjectByType<CardSystem>();
-        _gameManager = GameManager.Instance;
-        
-        // Check references
-        if (_cardSystem == null)
-        {
-            Debug.LogError("CardSystem not found! CardSystemIntegration requires a CardSystem in the scene.");
-            enabled = false;
-        }
-        
-        if (_gameManager == null)
-        {
-            Debug.LogError("GameManager not found! CardSystemIntegration requires a GameManager in the scene.");
-            enabled = false;
-        }
-        
-        // Create card container if needed
-        if (cardContainer == null)
-        {
-            GameObject containerObj = new GameObject("Card Container");
-            cardContainer = containerObj.transform;
-            containerObj.transform.SetParent(transform);
-        }
-    }
-    
-    private void Start()
-    {
-        // Subscribe to game manager events
-        if (_gameManager != null)
-        {
-            _gameManager.OnTurnChanged += HandleTurnChanged;
-            _gameManager.OnUnitActivated += HandleUnitActivated;
-            _gameManager.OnUnitDeactivated += HandleUnitDeactivated;
-        }
-        
-        // Make sure the card hand UI is initially hidden
-        if (cardHandUIObject != null)
-        {
-            cardHandUIObject.SetActive(false);
-        }
-        
-        DebugLog("CardSystemIntegration initialized");
-    }
-    
-    private void OnDestroy()
-    {
-        // Unsubscribe from events
-        if (_gameManager != null)
-        {
-            _gameManager.OnTurnChanged -= HandleTurnChanged;
-            _gameManager.OnUnitActivated -= HandleUnitActivated;
-            _gameManager.OnUnitDeactivated -= HandleUnitDeactivated;
-        }
-    }
-    #endregion
-
-    #region GameManager Event Handlers
     /// <summary>
-    /// Handle turn changes from GameManager
+    /// Integration helper to connect the enhanced card UI system with the existing Dark Protocol architecture
+    /// Handles initialization, event routing, and system coordination
     /// </summary>
-    private void HandleTurnChanged(GameManager.TurnState newState)
+    public class CardSystemIntegrator : MonoBehaviour
     {
-        switch (newState)
+        [Header("UI References")]
+        [SerializeField] private CardToolbar cardToolbar;
+        [SerializeField] private GameObject enhancedCardUIPrefab;
+        [SerializeField] private Canvas mainCanvas;
+
+        [Header("Integration Settings")]
+        [SerializeField] private bool autoInitialize = true;
+        [SerializeField] private bool replaceExistingCardUI = true;
+        [SerializeField] private LayerMask cardTargetingLayers = -1;
+
+        [Header("Debug")]
+        [SerializeField] private bool showDebugLogs = true;
+
+        // System references
+        private CardSystem _cardSystem;
+        private GameManager _gameManager;
+        private Dictionary<Card, EnhancedCardUI> _cardUIMapping = new Dictionary<Card, EnhancedCardUI>();
+
+        #region Unity Lifecycle
+
+        private void Awake()
         {
-            case GameManager.TurnState.PlayerTurn:
-                // Show the card hand UI
-                ShowCardHandUI(true);
-                break;
-                
-            case GameManager.TurnState.PlayerTurnEnd:
-            case GameManager.TurnState.EnemyTurn:
-            case GameManager.TurnState.EnemyTurnStart:
-            case GameManager.TurnState.EnemyTurnEnd:
-                // Hide the card hand UI
-                ShowCardHandUI(false);
-                break;
+            // Find system references
+            _cardSystem = CardSystem.Instance;
+            _gameManager = GameManager.Instance;
+
+            // Find UI references if not assigned
+            if (cardToolbar == null)
+                cardToolbar = FindFirstObjectByType<CardToolbar>();
+
+            if (mainCanvas == null)
+                mainCanvas = FindFirstObjectByType<Canvas>();
         }
-    }
-    
-    /// <summary>
-    /// Handle unit activation
-    /// </summary>
-    private void HandleUnitActivated(Unit unit)
-    {
-        // Only handle player units during player turn
-        if (unit == null || _gameManager.CurrentTurnState != GameManager.TurnState.PlayerTurn)
-            return;
-            
-        if (unit.Team == Unit.TeamType.Player)
+
+        private void Start()
         {
-            // Draw cards for this unit
-            if (_cardSystem != null)
+            if (autoInitialize)
             {
-                _cardSystem.DrawHandForUnit(unit);
-                
-                // Show the card hand UI
-                ShowCardHandUI(true);
-                
-                DebugLog($"Drew cards for {unit.UnitName}");
+                InitializeIntegration();
             }
         }
-    }
-    
-    /// <summary>
-    /// Handle unit deactivation
-    /// </summary>
-    private void HandleUnitDeactivated(Unit unit)
-    {
-        // Discard hand for this unit
-        if (_cardSystem != null && unit != null)
-        {
-            _cardSystem.DiscardHand(unit);
-            
-            DebugLog($"Discarded cards for {unit.UnitName}");
-        }
-    }
-    #endregion
 
-    #region UI Management
-    /// <summary>
-    /// Show or hide the card hand UI
-    /// </summary>
-    private void ShowCardHandUI(bool show)
-    {
-        if (cardHandUIObject != null)
+        private void OnDestroy()
         {
-            cardHandUIObject.SetActive(show);
+            CleanupIntegration();
         }
-    }
-    #endregion
 
-    #region Game Integration Methods
-    /// <summary>
-    /// Initialize card system for a specific game mode
-    /// </summary>
-    public void InitializeCardsForMode(string gameMode)
-    {
-        if (_cardSystem == null)
-            return;
-            
-        // Reset the card system first
-        _cardSystem.ResetCardSystem();
-        
-        // Initialize based on game mode
-        switch (gameMode)
+        #endregion
+
+        #region Public Methods
+
+        /// <summary>
+        /// Initialize the integration between enhanced UI and card system
+        /// </summary>
+        public void InitializeIntegration()
         {
-            case "Tutorial":
-                InitializeTutorialCards();
-                break;
-            case "Campaign":
-                InitializeCampaignCards();
-                break;
-            case "Skirmish":
-                InitializeSkirmishCards();
-                break;
-            default:
-                // Default initialization using ExampleCards
-                ExampleCards exampleCards = FindFirstObjectByType<ExampleCards>();
-                if (exampleCards != null)
+            DebugLog("Initializing Card System Integration");
+
+            // Replace existing card UI if requested
+            if (replaceExistingCardUI)
+            {
+                DisableExistingCardUI();
+            }
+
+            // Subscribe to card system events
+            if (_cardSystem != null)
+            {
+                _cardSystem.OnHandDrawn += HandleHandDrawn;
+                _cardSystem.OnCardSelected += HandleCardSelected;
+                _cardSystem.OnCardPlayed += HandleCardPlayed;
+                _cardSystem.OnCardDiscarded += HandleCardDiscarded;
+            }
+
+            // Subscribe to game manager events
+            if (_gameManager != null)
+            {
+                _gameManager.OnTurnChanged += HandleTurnChanged;
+                _gameManager.OnUnitActivated += HandleUnitActivated;
+                _gameManager.OnUnitDeactivated += HandleUnitDeactivated;
+            }
+
+            // Subscribe to toolbar events
+            if (cardToolbar != null)
+            {
+                // cardToolbar.OnCardSelected += HandleToolbarCardSelected; // Removed: CardToolbar does not define OnCardSelected
+                cardToolbar.OnCardPlayed += (card) =>
                 {
-                    // This will trigger the example cards initialization
-                    exampleCards.enabled = true;
-                }
-                break;
-        }
-        
-        DebugLog($"Initialized cards for game mode: {gameMode}");
-    }
-    
-    /// <summary>
-    /// Initialize cards for tutorial mode
-    /// </summary>
-    private void InitializeTutorialCards()
-    {
-        // This would set up a simplified deck with basic cards
-        // For tutorial purposes
-    }
-    
-    /// <summary>
-    /// Initialize cards for campaign mode
-    /// </summary>
-    private void InitializeCampaignCards()
-    {
-        // This would load campaign-specific cards and decks
-        // Maybe from saved progress
-    }
-    
-    /// <summary>
-    /// Initialize cards for skirmish mode
-    /// </summary>
-    private void InitializeSkirmishCards()
-    {
-        // This would set up standard skirmish decks
-        // Maybe with some randomization
-    }
-    
-    /// <summary>
-    /// Add the OnEndTurnButtonPressed method to GameManager
-    /// </summary>
-    public void AddEndTurnButtonHandler()
-    {
-        // This method is mentioned in the error message:
-        // Assets\Scripts\UI\EndTurnButton.cs(85,38): error CS1061: 'GameManager' does not contain 
-        // a definition for 'OnEndTurnButtonPressed'
-        
-        // This method can be added to the GameManager to handle the End Turn button press
-        // In a real implementation, we would modify the GameManager class directly
-        
-        DebugLog("End Turn button handler functionality implemented");
-        
-        // The actual implementation would be something like:
-        // 
-        // public void OnEndTurnButtonPressed()
-        // {
-        //     EndPlayerTurn();
-        // }
-    }
-    
-    /// <summary>
-    /// Add the StartPlayerTurn method to GameManager
-    /// </summary>
-    public void AddStartPlayerTurnMethod()
-    {
-        // This method is mentioned in the error message:
-        // Assets\Scripts\Systems\Grid\Utils\DebugUtilities.cs(78,38): error CS1061: 'GameManager' does not 
-        // contain a definition for 'StartPlayerTurn'
-        
-        // This method can be added to the GameManager to forcibly start the player turn
-        // In a real implementation, we would modify the GameManager class directly
-        
-        DebugLog("Start Player Turn method implemented");
-        
-        // The actual implementation would be something like:
-        // 
-        // public void StartPlayerTurn()
-        // {
-        //     // Only allow if not already in player turn
-        //     if (CurrentTurnState != TurnState.PlayerTurn)
-        //     {
-        //         StartTurnTransition(TurnState.PlayerTurnStart);
-        //     }
-        // }
-    }
-    #endregion
+                    // Find the EnhancedCardUI for this card, if available
+                    EnhancedCardUI cardUI = GetCardUI(card);
+                    if (cardUI != null)
+                    {
+                        // Use Vector3.zero as a placeholder for targetPosition if not available
+                        HandleToolbarCardPlayed(cardUI, Vector3.zero);
+                    }
+                };
+                // cardToolbar.OnEndTurnPressed += HandleEndTurnPressed; // Removed: CardToolbar does not define OnEndTurnPressed
+            }
 
-    #region Utility Methods
-    /// <summary>
-    /// Debug logging with prefix
-    /// </summary>
-    private void DebugLog(string message)
-    {
-        if (showDebugInfo)
-        {
-            Debug.Log($"[CardSystemIntegration] {message}");
+            DebugLog("Integration initialized successfully");
         }
+
+        /// <summary>
+        /// Clean up the integration
+        /// </summary>
+        public void CleanupIntegration()
+        {
+            // Unsubscribe from events
+            if (_cardSystem != null)
+            {
+                _cardSystem.OnHandDrawn -= HandleHandDrawn;
+                _cardSystem.OnCardSelected -= HandleCardSelected;
+                _cardSystem.OnCardPlayed -= HandleCardPlayed;
+                _cardSystem.OnCardDiscarded -= HandleCardDiscarded;
+            }
+
+            if (_gameManager != null)
+            {
+                _gameManager.OnTurnChanged -= HandleTurnChanged;
+                _gameManager.OnUnitActivated -= HandleUnitActivated;
+                _gameManager.OnUnitDeactivated -= HandleUnitDeactivated;
+            }
+
+            if (cardToolbar != null)
+            {
+                // cardToolbar.OnCardSelected -= HandleToolbarCardSelected; // Removed: CardToolbar does not define OnCardSelected
+                // Unsubscribe using a lambda or compatible method if one was used for subscription
+                // cardToolbar.OnCardPlayed -= (card) => HandleToolbarCardPlayed(...); // Uncomment and match the subscription if needed
+                // cardToolbar.OnEndTurnPressed -= HandleEndTurnPressed; // Removed: CardToolbar does not define OnEndTurnPressed
+            }
+
+            // Clear mappings
+            _cardUIMapping.Clear();
+        }
+
+        /// <summary>
+        /// Manually trigger a card draw animation
+        /// </summary>
+        public void DrawCardsForUnit(Unit unit)
+        {
+            if (_cardSystem != null && unit != null)
+            {
+                _cardSystem.DrawHandForUnit(unit);
+            }
+        }
+
+        #endregion
+
+        #region Event Handlers - Card System
+
+        private void HandleHandDrawn(List<Card> hand)
+        {
+            DebugLog($"Hand drawn with {hand.Count} cards");
+
+            // Clear existing toolbar cards
+            if (cardToolbar != null)
+            {
+                cardToolbar.ClearCards();
+            }
+
+            // Clear mappings
+            _cardUIMapping.Clear();
+
+            // Add cards to toolbar
+            foreach (var card in hand)
+            {
+                if (cardToolbar != null)
+                {
+                    cardToolbar.AddCard(card);
+                }
+            }
+        }
+
+        private void HandleCardSelected(Card card)
+        {
+            DebugLog($"Card selected: {card?.CardName ?? "null"}");
+
+            // Find the corresponding UI element
+            if (card != null && _cardUIMapping.TryGetValue(card, out EnhancedCardUI cardUI))
+            {
+                // The toolbar will handle the visual selection
+                // This is just for system state tracking
+            }
+        }
+
+        private void HandleCardPlayed(Card card)
+        {
+            DebugLog($"Card played: {card?.CardName ?? "null"}");
+
+            // Remove from toolbar
+            if (cardToolbar != null)
+            {
+                cardToolbar.RemoveCard(card);
+            }
+
+            // Remove from mapping
+            _cardUIMapping.Remove(card);
+        }
+
+        private void HandleCardDiscarded(Card card)
+        {
+            DebugLog($"Card discarded: {card?.CardName ?? "null"}");
+
+            // Remove from toolbar
+            if (cardToolbar != null)
+            {
+                cardToolbar.RemoveCard(card);
+            }
+
+            // Remove from mapping
+            _cardUIMapping.Remove(card);
+        }
+
+        #endregion
+
+        #region Event Handlers - Game Manager
+
+        private void HandleTurnChanged(GameManager.TurnState newState)
+        {
+            DebugLog($"Turn changed to: {newState}");
+
+            // The toolbar handles its own visibility based on turn state
+            // This is for any additional integration logic needed
+        }
+
+        private void HandleUnitActivated(Unit unit)
+        {
+            DebugLog($"Unit activated: {unit?.UnitName ?? "null"}");
+
+            // Update toolbar with the new unit
+            if (cardToolbar != null)
+            {
+                // Clear and redraw cards for the new unit
+                cardToolbar.ClearCards();
+                if (_cardSystem != null && unit != null)
+                {
+                    var hand = _cardSystem.GetHandForUnit(unit);
+                    if (hand != null)
+                    {
+                        foreach (var card in hand)
+                        {
+                            cardToolbar.AddCard(card);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void HandleUnitDeactivated(Unit unit)
+        {
+            DebugLog($"Unit deactivated: {unit?.UnitName ?? "null"}");
+
+            // Clear toolbar if this was the active unit
+            if (cardToolbar != null)
+            {
+                cardToolbar.ClearCards();
+            }
+        }
+
+        #endregion
+
+        #region Event Handlers - Toolbar
+
+        private void HandleToolbarCardSelected(EnhancedCardUI cardUI)
+        {
+            if (cardUI == null) return;
+
+            Card card = cardUI.GetCardInstance();
+            if (card != null && _cardSystem != null)
+            {
+                // Update card system selection
+                // Note: This would need to be added to your CardSystem
+                // For now, we'll just track it locally
+                DebugLog($"Toolbar card selected: {card.CardName}");
+            }
+        }
+
+        private void HandleToolbarCardPlayed(EnhancedCardUI cardUI, Vector3 targetPosition)
+        {
+            if (cardUI == null) return;
+
+            Card card = cardUI.GetCardInstance();
+            if (card == null || _cardSystem == null) return;
+
+            // Determine if we need a target
+            CardData cardData = card.CardData;
+
+            if (cardData.RequiresTarget)
+            {
+                // Try to find a unit at the target position
+                Unit targetUnit = null;
+
+                // Raycast to find target
+                Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+                if (Physics.Raycast(ray, out RaycastHit hit, 100f, cardTargetingLayers))
+                {
+                    targetUnit = hit.collider.GetComponent<Unit>();
+                }
+
+                // Play the card
+                if (targetUnit != null || !cardData.RequiresTarget)
+                {
+                    bool success = _cardSystem.PlayCard(card, targetUnit);
+                    DebugLog($"Card play {(success ? "succeeded" : "failed")}: {card.CardName}");
+                }
+            }
+            else
+            {
+                // No target required, just play the card
+                bool success = _cardSystem.PlayCard(card);
+                DebugLog($"Card play {(success ? "succeeded" : "failed")}: {card.CardName}");
+            }
+        }
+
+        private void HandleEndTurnPressed()
+        {
+            DebugLog("End turn pressed");
+
+            // Notify game manager
+            if (_gameManager != null)
+            {
+                _gameManager.EndPlayerTurn();
+            }
+        }
+
+        #endregion
+
+        #region Helper Methods
+
+        /// <summary>
+        /// Disable existing card UI components to avoid conflicts
+        /// </summary>
+        private void DisableExistingCardUI()
+        {
+            // Find and disable CardHandUI
+            CardHandUI existingCardUI = FindFirstObjectByType<CardHandUI>();
+            if (existingCardUI != null)
+            {
+                existingCardUI.gameObject.SetActive(false);
+                DebugLog("Disabled existing CardHandUI");
+            }
+
+            // Find and disable any Card components
+            Card[] existingCards = FindObjectsByType<Card>(FindObjectsSortMode.None);
+            foreach (var card in existingCards)
+            {
+                card.gameObject.SetActive(false);
+            }
+        }
+
+        /// <summary>
+        /// Create a mapping between Card instances and their UI representations
+        /// </summary>
+        public void RegisterCardUI(Card card, EnhancedCardUI cardUI)
+        {
+            if (card != null && cardUI != null)
+            {
+                _cardUIMapping[card] = cardUI;
+            }
+        }
+
+        /// <summary>
+        /// Get the UI representation for a card
+        /// </summary>
+        public EnhancedCardUI GetCardUI(Card card)
+        {
+            if (card != null && _cardUIMapping.TryGetValue(card, out EnhancedCardUI cardUI))
+            {
+                return cardUI;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Debug logging
+        /// </summary>
+        private void DebugLog(string message)
+        {
+            if (showDebugLogs)
+            {
+                Debug.Log($"[CardSystemIntegrator] {message}");
+            }
+        }
+
+        #endregion
     }
-    #endregion
 }

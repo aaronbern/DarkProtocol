@@ -10,7 +10,7 @@ namespace DarkProtocol.Grid
     public class GridSerializationService : IGridSerializationService
     {
         private readonly IGridService _gridService;
-        
+
         /// <summary>
         /// Constructor
         /// </summary>
@@ -19,7 +19,7 @@ namespace DarkProtocol.Grid
         {
             _gridService = gridService;
         }
-        
+
         /// <summary>
         /// Save grid data to a file
         /// </summary>
@@ -31,7 +31,7 @@ namespace DarkProtocol.Grid
                 Debug.LogWarning("Cannot save grid data: Grid service or GridData is null");
                 return;
             }
-            
+
             try
             {
                 // Forward to the grid data
@@ -43,7 +43,7 @@ namespace DarkProtocol.Grid
                 Debug.LogError($"Failed to save grid data: {e.Message}");
             }
         }
-        
+
         /// <summary>
         /// Load grid data from a file
         /// </summary>
@@ -55,7 +55,7 @@ namespace DarkProtocol.Grid
                 Debug.LogWarning("Cannot load grid data: Grid service or GridData is null");
                 return;
             }
-            
+
             try
             {
                 // Forward to the grid data
@@ -67,7 +67,7 @@ namespace DarkProtocol.Grid
                 Debug.LogError($"Failed to load grid data: {e.Message}");
             }
         }
-        
+
         /// <summary>
         /// Export grid data to a different format
         /// </summary>
@@ -80,7 +80,7 @@ namespace DarkProtocol.Grid
                 Debug.LogWarning("Cannot export grid data: Grid service or GridData is null");
                 return;
             }
-            
+
             try
             {
                 switch (format)
@@ -101,7 +101,7 @@ namespace DarkProtocol.Grid
                 Debug.LogError($"Failed to export grid data: {e.Message}");
             }
         }
-        
+
         /// <summary>
         /// Export grid data to JSON format
         /// </summary>
@@ -118,7 +118,7 @@ namespace DarkProtocol.Grid
                 MapOrigin = new Vector3Serializable(gridData.MapOrigin),
                 Tiles = new TileExportData[gridData.Width * gridData.Height]
             };
-            
+
             // Export tile data
             for (int x = 0; x < gridData.Width; x++)
             {
@@ -126,7 +126,7 @@ namespace DarkProtocol.Grid
                 {
                     int index = z * gridData.Width + x;
                     TileData tile = gridData.GetTileData(x, z);
-                    
+
                     exportData.Tiles[index] = new TileExportData
                     {
                         X = x,
@@ -140,14 +140,14 @@ namespace DarkProtocol.Grid
                     };
                 }
             }
-            
+
             // Serialize to JSON
             string json = JsonUtility.ToJson(exportData, true);
             File.WriteAllText(filePath, json);
-            
+
             Debug.Log($"Grid data exported to JSON: {filePath}");
         }
-        
+
         /// <summary>
         /// Export grid data to CSV format
         /// </summary>
@@ -155,31 +155,31 @@ namespace DarkProtocol.Grid
         private void ExportToCsv(string filePath)
         {
             var gridData = _gridService.GridData;
-            
+
             // Create CSV header
             string header = "X,Z,TerrainType,MovementCost,IsWalkable,IsOccupied,Elevation,CoverType";
-            
+
             // Create CSV rows
             System.Text.StringBuilder sb = new System.Text.StringBuilder();
             sb.AppendLine(header);
-            
+
             for (int x = 0; x < gridData.Width; x++)
             {
                 for (int z = 0; z < gridData.Height; z++)
                 {
                     TileData tile = gridData.GetTileData(x, z);
-                    
+
                     sb.AppendLine($"{x},{z},{(int)tile.TerrainType},{tile.MovementCost},{tile.IsWalkable},{tile.IsOccupied},{tile.Elevation},{(int)tile.CoverType}");
                 }
             }
-            
+
             // Write to file
             File.WriteAllText(filePath, sb.ToString());
-            
+
             Debug.Log($"Grid data exported to CSV: {filePath}");
         }
     }
-    
+
     /// <summary>
     /// Export format for grid data
     /// </summary>
@@ -188,7 +188,7 @@ namespace DarkProtocol.Grid
         JSON,
         CSV
     }
-    
+
     /// <summary>
     /// Serializable data for grid export
     /// </summary>
@@ -201,7 +201,7 @@ namespace DarkProtocol.Grid
         public Vector3Serializable MapOrigin;
         public TileExportData[] Tiles;
     }
-    
+
     /// <summary>
     /// Serializable data for tile export
     /// </summary>
@@ -217,7 +217,7 @@ namespace DarkProtocol.Grid
         public float Elevation;
         public int CoverType;
     }
-    
+
     /// <summary>
     /// Serializable Vector3 for JSON serialization
     /// </summary>
@@ -225,14 +225,14 @@ namespace DarkProtocol.Grid
     public class Vector3Serializable
     {
         public float X, Y, Z;
-        
+
         public Vector3Serializable(Vector3 vector)
         {
             X = vector.x;
             Y = vector.y;
             Z = vector.z;
         }
-        
+
         public Vector3 ToVector3()
         {
             return new Vector3(X, Y, Z);

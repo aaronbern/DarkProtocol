@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using DarkProtocol.Grid;
+using DarkProtocol.UI;
 
 /// <summary>
 /// Enhanced GameManager for Dark Protocol - Handles the complete turn-based combat system
@@ -197,7 +198,29 @@ public class GameManager : MonoBehaviour
             // Set up the audio manager
             _audioManager.Initialize(musicSource, sfxSource);
         }
-        
+
+        NameplateManager nameplateManager = FindFirstObjectByType<NameplateManager>();
+        if (nameplateManager == null)
+        {
+            GameObject nameplateManagerObj = new GameObject("Nameplate Manager");
+            nameplateManager = nameplateManagerObj.AddComponent<NameplateManager>();
+        }
+
+        // Initialize Tooltip System
+        TooltipSystem tooltipSystem = FindFirstObjectByType<TooltipSystem>();
+        if (tooltipSystem == null)
+        {
+            GameObject tooltipSystemObj = new GameObject("Tooltip System");
+            tooltipSystem = tooltipSystemObj.AddComponent<TooltipSystem>();
+
+            // Parent it to the UI canvas
+            Canvas uiCanvas = FindAnyObjectByType<Canvas>();
+            if (uiCanvas != null)
+            {
+                tooltipSystemObj.transform.SetParent(uiCanvas.transform);
+            }
+        }
+
         // Create MissionManager if needed
         _missionManager = FindFirstObjectByType<MissionManager>();
         if (_missionManager == null)

@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 293aec6bc6eb1f9438e4970dbaf26a38, type: 3}
   m_Name: DefaultGridData
   m_EditorClassIdentifier: 
-  width: 50
-  height: 50
+  width: 100
+  height: 100
   cellSize: 1
-  mapOrigin: {x: -25, y: 0, z: -25}
+  mapOrigin: {x: -50, y: 0, z: -50}
   chunkSize: 10
   maxVisibleDistance: 20
   updateBudgetPerFrame: 0.1

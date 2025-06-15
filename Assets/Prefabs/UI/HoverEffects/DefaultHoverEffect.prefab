@@ -109,3 +109,4 @@ MonoBehaviour:
   rotationSpeed: 30
   fadeEffect: 1
   fadeDuration: 0.2
+  debugLogging: 0

@@ -261,26 +261,36 @@ namespace DarkProtocol.Grid
                 Gizmos.DrawLine(start, end);
             }
         }
-        #endif
+#endif
         #region Public Methods (Compatibility API)
         /// <summary>
         /// Create a new grid with default settings
         /// </summary>
         public void CreateNewGrid()
         {
+            // Destroy old grid visuals
+            if (gridParent != null)
+            {
+                for (int i = gridParent.childCount - 1; i >= 0; i--)
+                {
+                    DestroyImmediate(gridParent.GetChild(i).gameObject);
+                }
+            }
+
             if (_gridService != null)
             {
                 ((GridService)_gridService).CreateNewGrid();
                 gridData = ((GridService)_gridService).GridData;
 
-                // Generate chunk renderers
+                // Generate new chunk renderers
                 if (gridData != null)
                 {
                     gridData.GenerateChunkRenderers(gridParent);
                 }
             }
         }
-        
+
+
         /// <summary>
         /// Check if a position is valid on the grid
         /// </summary>
